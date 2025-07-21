@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>top-level-items</key>
+	<array>
+		<dict>
+			<key>destination</key>
+			<dict>
+				<key>location-parameters</key>
+				<dict>
+					<key>EndingColumnNumber</key>
+					<string>115</string>
+					<key>EndingLineNumber</key>
+					<string>11</string>
+					<key>StartingColumnNumber</key>
+					<string>115</string>
+					<key>StartingLineNumber</key>
+					<string>11</string>
+					<key>Timestamp</key>
+					<string>774542082.870296</string>
+				</dict>
+				<key>rebasable-url</key>
+				<dict>
+					<key>base</key>
+					<string>workspace</string>
+					<key>payload</key>
+					<dict>
+						<key>relative-path</key>
+						<string>foo_sample/pugixml/docs/samples/load_stream.cpp</string>
+					</dict>
+				</dict>
+			</dict>
+			<key>text-context</key>
+			<dict>
+				<key>focused</key>
+				<string></string>
+				<key>leading</key>
+				<string>        &lt;&lt; message
+        &lt;&lt; "\t: load result '" &lt;&lt; result.description() &lt;&lt; "'"
+        &lt;&lt; ", first character of root name: U+" &lt;&lt; std::hex &lt;&lt; std::uppercase &lt;&lt; std::setw(4) &lt;&lt; std::setfill('0') </string>
+				<key>trailing</key>
+				<string>&lt;&lt; pugi::as_wide(doc.first_child().name())[0]
+        &lt;&lt; ", year: " &lt;&lt; doc.first_child().first_child().first_child().child_value()
+        &lt;&lt; std::endl;
+</string>
+			</dict>
+			<key>title</key>
+			<string>Error: Overload resolution selected deleted operator '&lt;&lt;'</string>
+			<key>type</key>
+			<string>bookmark</string>
+		</dict>
+	</array>
+</dict>
+</plist>
