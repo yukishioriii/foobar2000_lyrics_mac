@@ -2,9 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "container:../../pugixml/scripts/pugixml.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "container:../foobar2000_component_client/foobar2000_component_client.xcodeproj">
    </FileRef>
    <FileRef

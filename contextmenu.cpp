@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include <curl/curl.h>
-#include <string>
 #include <pugixml.hpp>
 
 #include <tidy.h>
@@ -8,6 +7,13 @@
 #include <stdio.h>
 
 #include <fstream>
+#include <regex>
+
+#include <string>
+#include <iterator>
+
+#include <iostream>
+#include <regex>
 
 // Identifier of our context menu group. Substitute with your own when reusing code.
 static const GUID guid_mygroup = { 0x572de7f4, 0xcbdf, 0x479a, { 0x97, 0x26, 0xa, 0xb0, 0x97, 0x47, 0x69, 0xe3 } };
@@ -281,20 +287,130 @@ static void add_all_text_to_string(std::string& output, const pugi::xml_node& no
     }
 }
 
-static void azlyrics_search(pfc::string_formatter& message) {
+
+std::string_view trim_trailing_text_in_brackets(std::string_view str)
+{
+    std::string_view result = str;
+    while(true)
+    {
+        size_t open_index = result.find_last_of("([{");
+        if(open_index == std::string_view::npos)
+        {
+            break; // Nothing to trim
+        }
+        
+        if(open_index == 0)
+        {
+            break; // Don't trim the entire string!
+        }
+        
+        char opener = result[open_index];
+        char closer = '\0';
+        switch(opener)
+        {
+            case '[': closer = ']'; break;
+            case '(': closer = ')'; break;
+            case '{': closer = '}'; break;
+        }
+        assert(closer != '\0');
+        
+        size_t close_index = result.find_first_of(closer, open_index);
+        if(close_index == std::string_view::npos)
+        {
+            break; // Unmatched open-bracket
+        }
+        
+        result = result.substr(0, open_index);
+    }
+    
+    return result;
+}
+
+
+std::string track_metadata(const file_info& track_info, std::string_view key)
+{
+    size_t value_index = track_info.meta_find_ex(key.data(), key.length());
+    if(value_index == pfc::infinite_size)
+    {
+        return "";
+    }
+    
+    size_t value_count = track_info.meta_enum_value_count(value_index);
+    if(value_count == 0)
+    {
+        return "";
+    }
+    
+    if(value_count > 1)
+    {
+        std::string err_msg;
+        err_msg += "metadata tag ";
+        err_msg += key;
+        err_msg += " appears multiple times for ";
+        const char* const err_tags[] = { "artist", "album", "title" };
+        for(const char* err_tag : err_tags)
+        {
+            err_msg += "/";
+            size_t err_index = track_info.meta_find(err_tag);
+            if(err_index == pfc::infinite_size) continue;
+            
+            size_t err_tag_count = track_info.meta_enum_value_count(err_index);
+            if(err_tag_count == 0) continue;
+            const char* err_tag_value = track_info.meta_enum_value(err_index, 0);
+        }
+    }
+    
+    return track_info.meta_enum_value(value_index, 0);
+}
+
+
+
+std::string track_metadata(const metadb_v2_rec_t& track, std::string_view key)
+{
+    if(track.info == nullptr)
+    {
+        return {};
+    }
+    
+    const file_info& track_info = track.info->info();
+    return track_metadata(track_info, key);
+}
+
+
+std::string remove_chars_for_url( std::string_view input) {
+    std::regex r("[^a-zA-Z]");
+    std::string data = std::string(input);
+    std::transform(data.begin(), data.end(), data.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    std::string result = std::regex_replace(std::string(data).c_str(), r, "");
+    
+    return result;
+}
+
+
+static void azlyrics_search(const metadb_v2_rec_t& track_info, pfc::string_formatter& message) {
     
     CURL *curl;
     CURLcode res;
     std::string readBuffer;
     curl = curl_easy_init();
     if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, "https://www.azlyrics.com/lyrics/mileycyrus/wtfdoiknow.html");
+        
+        std::string url_artist = remove_chars_for_url(track_metadata(track_info, "artist"));
+        std::string url_title = remove_chars_for_url(track_metadata(track_info, "title"));
+        
+        std::string url = "https://www.azlyrics.com/lyrics/" + url_artist + "/" + url_title + ".html";
+        message << "getting : " << url.c_str();
+        
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
         res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         
         std::string lyric_text;
+        
+        
         pugi::xml_document doc;
         load_html_document(readBuffer.c_str(), doc);
         
@@ -314,17 +430,50 @@ static void azlyrics_search(pfc::string_formatter& message) {
 
 
 
+metadb_v2_rec_t get_full_metadata(metadb_handle_ptr track)
+{
+    // This is effectively a duplicate of `metadb_handle_ptr::query_v2_()` except that
+    // we need to call get_*full*_info_ref(), not just get_browse_info_ref() so that we
+    // always have data for non-standard tags like lyrics when running in fb2k pre-v2.
+    // This function can be removed if we migrate to targetting FB2K SDK version 81 or higher.
+    
+    metadb_handle_v2::ptr track_v2;
+    if(track->cast(track_v2))
+    {
+        return track_v2->query_v2();
+    }
+    
+    metadb_v2_rec_t result = {};
+    try
+    {
+        result.info = track->get_full_info_ref(fb2k::mainAborter());
+    }
+    catch(pfc::exception ex)
+    {
+        //        LOG_INFO("Failed to retrieve metadata for track due to IO error: %s", ex.what());
+    }
+    catch(...)
+    {
+        //        LOG_INFO("Failed to retrieve metadata for track due to an unknown error");
+    }
+    return result;
+}
+
+
+
 static void RunWack(metadb_handle_list_cref data) {
     pfc::string_formatter message;
     
-    message << "Feck u.\n";
+    message << "alu u.\n";
     if (data.get_count() > 0) {
         message << "Parameters:\n";
         for(t_size walk = 0; walk < data.get_count(); ++walk) {
             message << data[walk] << "\n";
         }
     }
+    metadb_handle_ptr track = data.get_item(0);
+    const metadb_v2_rec_t track_info = get_full_metadata(track);
+    azlyrics_search(track_info, message);
     
     popup_message::g_show(message, "yeet");
 }
-
