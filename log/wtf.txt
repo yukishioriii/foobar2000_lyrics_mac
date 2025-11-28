@@ -1,4 +1,0 @@
-force-output: yes
-indent-spaces: 0
-output-xhtml: yes
-output-xml: yes
