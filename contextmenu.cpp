@@ -32,6 +32,8 @@ static void RunWack(metadb_handle_list_cref data);
 
 static void RunQQMusic(metadb_handle_list_cref data);
 
+static void RunNetEase(metadb_handle_list_cref data);
+
 metadb_v2_rec_t get_full_metadata(metadb_handle_ptr track);
 
 void RunCalculatePeak(metadb_handle_list_cref data); //decode.cpp
@@ -80,6 +82,7 @@ class myitem : public contextmenu_item_simple {
         cmd_test1 = 0,
         wack,
         qqmusic,
+        netease,
         cmd_total
     };
     GUID get_parent() {return guid_mygroup;}
@@ -89,6 +92,7 @@ class myitem : public contextmenu_item_simple {
             case cmd_test1: p_out = "ignored"; break;
             case wack: p_out = "AZLyrics"; break;
             case qqmusic: p_out = "QQ Music"; break;
+            case netease: p_out = "NetEase"; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
     }
@@ -102,6 +106,9 @@ class myitem : public contextmenu_item_simple {
                 break;
             case qqmusic:
                 RunQQMusic(p_data);
+                break;
+            case netease:
+                RunNetEase(p_data);
                 break;
             default:
                 uBugCheck();
@@ -126,11 +133,13 @@ class myitem : public contextmenu_item_simple {
         static const GUID guid_test1 = { 0x4021c80d, 0x9340, 0x423b, { 0xa3, 0xe2, 0x8e, 0x1e, 0xda, 0x87, 0x13, 0x7f } };
         static const GUID guid_wack = { 0x4021c79d, 0x9340, 0x423b, { 0xa3, 0xe2, 0x8e, 0x1e, 0xda, 0x87, 0x13, 0x7f } };
         static const GUID guid_qqmusic = { 0x5b32d81e, 0xa451, 0x4c9a, { 0xb4, 0xf3, 0x9f, 0x2f, 0xeb, 0x98, 0x24, 0x8c } };
+        static const GUID guid_netease = { 0x6c43e92f, 0xb562, 0x4dab, { 0xc5, 0x04, 0xa0, 0x40, 0xfc, 0xa9, 0x35, 0x9d } };
 
         switch(p_index) {
             case cmd_test1: return guid_test1;
             case wack: return guid_wack;
             case qqmusic: return guid_qqmusic;
+            case netease: return guid_netease;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
 
@@ -145,6 +154,9 @@ class myitem : public contextmenu_item_simple {
                 return true;
             case qqmusic:
                 p_out = "Search lyrics on QQ Music (synced lyrics)";
+                return true;
+            case netease:
+                p_out = "Search lyrics on NetEase (synced lyrics)";
                 return true;
             default:
                 uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
@@ -676,6 +688,192 @@ static void RunQQMusic(metadb_handle_list_cref data) {
     qqmusic_search(track_info, message);
 
     popup_message::g_show(message, "QQ Music Lyrics");
+}
+
+
+// NetEase Music lyrics lookup by song ID
+static std::string netease_lookup(const std::string& song_id, pfc::string_formatter& message) {
+    std::string lyrics;
+    CURL *curl;
+    CURLcode res;
+    std::string readBuffer;
+
+    curl = curl_easy_init();
+    if (curl) {
+        std::string url = "https://music.163.com/api/song/lyric?tv=-1&kv=-1&lv=-1&os=pc&id=" + song_id;
+        message << "Fetching lyrics from: " << url.c_str() << "\n";
+
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Referer: https://music.163.com");
+        headers = curl_slist_append(headers, "Cookie: appver=2.0.2");
+        headers = curl_slist_append(headers, "charset: utf-8");
+        headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+        headers = curl_slist_append(headers, "X-Real-IP: 202.96.0.0");
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+        res = curl_easy_perform(curl);
+
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+
+        if (res == CURLE_OK) {
+            cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
+            if (json != nullptr && json->type == cJSON_Object) {
+                cJSON* lrc_item = cJSON_GetObjectItem(json, "lrc");
+                if (lrc_item != nullptr && lrc_item->type == cJSON_Object) {
+                    cJSON* lrc_lyric = cJSON_GetObjectItem(lrc_item, "lyric");
+                    if (lrc_lyric != nullptr && lrc_lyric->type == cJSON_String) {
+                        lyrics = lrc_lyric->valuestring;
+                    }
+                }
+            }
+            cJSON_Delete(json);
+        }
+    }
+
+    return lyrics;
+}
+
+
+// NetEase Music search
+static void netease_search(const metadb_v2_rec_t& track_info, pfc::string_formatter& message) {
+    CURL *curl;
+    CURLcode res;
+    std::string readBuffer;
+
+    curl = curl_easy_init();
+    if (curl) {
+        std::string artist = track_metadata(track_info, "artist");
+        std::string title = track_metadata(track_info, "title");
+
+        std::string url = "https://music.163.com/api/search/get?s="
+                          + urlencode(artist) + '+' + urlencode(title)
+                          + "&type=1&offset=0&sub=false&limit=5";
+
+        message << "Searching NetEase: " << url.c_str() << "\n";
+
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Referer: https://music.163.com");
+        headers = curl_slist_append(headers, "Cookie: appver=2.0.2");
+        headers = curl_slist_append(headers, "charset: utf-8");
+        headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+        headers = curl_slist_append(headers, "X-Real-IP: 202.96.0.0");
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+        res = curl_easy_perform(curl);
+
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+
+        if (res != CURLE_OK) {
+            message << "CURL error: " << curl_easy_strerror(res) << "\n";
+            return;
+        }
+
+        // Parse JSON response to get song ID
+        cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
+        if (json == nullptr || json->type != cJSON_Object) {
+            message << "Failed to parse JSON response\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        cJSON* result_obj = cJSON_GetObjectItem(json, "result");
+        if (result_obj == nullptr || result_obj->type != cJSON_Object) {
+            message << "No 'result' in response\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        cJSON* song_arr = cJSON_GetObjectItem(result_obj, "songs");
+        if (song_arr == nullptr || song_arr->type != cJSON_Array) {
+            message << "No 'songs' in response\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        int song_count = cJSON_GetArraySize(song_arr);
+        if (song_count <= 0) {
+            message << "No songs found\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        // Get first song result
+        cJSON* song_item = cJSON_GetArrayItem(song_arr, 0);
+        if (song_item == nullptr || song_item->type != cJSON_Object) {
+            message << "Invalid song item\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        // Get song ID (numeric)
+        cJSON* id_item = cJSON_GetObjectItem(song_item, "id");
+        if (id_item == nullptr || id_item->type != cJSON_Number) {
+            message << "No song ID found\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        std::string song_id = std::to_string((int64_t)id_item->valuedouble);
+
+        // Get song info for display
+        cJSON* title_item = cJSON_GetObjectItem(song_item, "name");
+        if (title_item && title_item->type == cJSON_String) {
+            message << "Title: " << title_item->valuestring << "\n";
+        }
+
+        // Get artist from artists array
+        cJSON* artist_list = cJSON_GetObjectItem(song_item, "artists");
+        if (artist_list && artist_list->type == cJSON_Array && cJSON_GetArraySize(artist_list) > 0) {
+            cJSON* first_artist = cJSON_GetArrayItem(artist_list, 0);
+            if (first_artist && first_artist->type == cJSON_Object) {
+                cJSON* artist_name = cJSON_GetObjectItem(first_artist, "name");
+                if (artist_name && artist_name->type == cJSON_String) {
+                    message << "Artist: " << artist_name->valuestring << "\n";
+                }
+            }
+        }
+
+        message << "Song ID: " << song_id.c_str() << "\n\n";
+
+        cJSON_Delete(json);
+
+        // Now lookup the lyrics using the song ID
+        std::string lyrics = netease_lookup(song_id, message);
+        if (!lyrics.empty()) {
+            message << "--- Lyrics ---\n" << lyrics.c_str() << "\n";
+        } else {
+            message << "No lyrics found for this song\n";
+        }
+    }
+}
+
+
+static void RunNetEase(metadb_handle_list_cref data) {
+    pfc::string_formatter message;
+
+    if (data.get_count() == 0) {
+        message << "No track selected\n";
+        popup_message::g_show(message, "NetEase Lyrics");
+        return;
+    }
+
+    metadb_handle_ptr track = data.get_item(0);
+    const metadb_v2_rec_t track_info = get_full_metadata(track);
+    netease_search(track_info, message);
+
+    popup_message::g_show(message, "NetEase Lyrics");
 }
 
 
