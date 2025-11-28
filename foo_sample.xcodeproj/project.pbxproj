@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -34,7 +34,123 @@
 		AA36E9132E2A9A7D00E02194 /* libcurl.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = AA36E9122E2A9A7D00E02194 /* libcurl.tbd */; };
 		AA36E9232E2A9D7D00E02194 /* pugixml.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA36E9182E2A9B4F00E02194 /* pugixml.cpp */; };
 		AA9320992E2B1FCB00559177 /* wac.xml in Resources */ = {isa = PBXBuildFile; fileRef = AA9320982E2B1FCB00559177 /* wac.xml */; };
+		AACJSON0001 /* cJSON.c in Sources */ = {isa = PBXBuildFile; fileRef = AACJSON0002 /* cJSON.c */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AA8031142EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA801F282EDA34F7008E4FAD /* foo_sample.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 0F1FDDAD2AA0AD9B00DE8967;
+			remoteInfo = foo_sample;
+		};
+		AA8031172EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA801F432EDA34F7008E4FAD /* foobar2000_component_client.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 0F1FDDD42AA0B2FB00DE8967;
+			remoteInfo = foobar2000_component_client;
+		};
+		AA80311A2EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8020462EDA34F7008E4FAD /* foobar2000_SDK.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B1DD3657198A721800EF7043;
+			remoteInfo = foobar2000_SDK;
+		};
+		AA80311D2EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA801F852EDA34F7008E4FAD /* foobar2000_SDK_helpers.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B12D1DB11991061A0087CEF3;
+			remoteInfo = foobar2000_SDK_helpers;
+		};
+		AA8031212EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA80217F2EDA34F7008E4FAD /* pfc.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B1DD35AF198A6FAA00EF7043;
+			remoteInfo = "pfc-Mac";
+		};
+		AA8031232EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA80217F2EDA34F7008E4FAD /* pfc.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B16695F419ACC12A0001728F;
+			remoteInfo = "pfc-iOS";
+		};
+		AA8031262EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8022042EDA34F7008E4FAD /* pugixml.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 1DA04ADC64C3566D16C45B6D;
+			remoteInfo = pugixml;
+		};
+		AA8031292EDA34F8008E4FAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8020CD2EDA34F7008E4FAD /* shared.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 0F75F3792A6B1A3900A45078;
+			remoteInfo = shared;
+		};
+		AA8A67F32EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A55EE2EDA379A000192C9 /* foo_sample.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 0F1FDDAD2AA0AD9B00DE8967;
+			remoteInfo = foo_sample;
+		};
+		AA8A67F62EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A56092EDA379A000192C9 /* foobar2000_component_client.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 0F1FDDD42AA0B2FB00DE8967;
+			remoteInfo = foobar2000_component_client;
+		};
+		AA8A67F92EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A570C2EDA379A000192C9 /* foobar2000_SDK.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B1DD3657198A721800EF7043;
+			remoteInfo = foobar2000_SDK;
+		};
+		AA8A67FC2EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A564B2EDA379A000192C9 /* foobar2000_SDK_helpers.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B12D1DB11991061A0087CEF3;
+			remoteInfo = foobar2000_SDK_helpers;
+		};
+		AA8A68002EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A58452EDA379A000192C9 /* pfc.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B1DD35AF198A6FAA00EF7043;
+			remoteInfo = "pfc-Mac";
+		};
+		AA8A68022EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A58452EDA379A000192C9 /* pfc.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = B16695F419ACC12A0001728F;
+			remoteInfo = "pfc-iOS";
+		};
+		AA8A68052EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A58CA2EDA379A000192C9 /* pugixml.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 1DA04ADC64C3566D16C45B6D;
+			remoteInfo = pugixml;
+		};
+		AA8A68082EDA37AD000192C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA8A57932EDA379A000192C9 /* shared.xcodeproj */;
+			proxyType = 2;
+			remoteGlobalIDString = 0F75F3792A6B1A3900A45078;
+			remoteInfo = shared;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0F1FDDAD2AA0AD9B00DE8967 /* foo_sample.component */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = foo_sample.component; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -82,7 +198,23 @@
 		AA36E9242E2AAA2100E02194 /* libtidy.A.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libtidy.A.tbd; path = usr/lib/libtidy.A.tbd; sourceTree = SDKROOT; };
 		AA36E9262E2AACE500E02194 /* libtidy.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libtidy.a; path = ../../../../../../../usr/local/lib/libtidy.a; sourceTree = "<group>"; };
 		AA36E9292E2AAFC200E02194 /* libtidy.5.8.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libtidy.5.8.0.dylib; path = ../../../../../../../usr/local/lib/libtidy.5.8.0.dylib; sourceTree = "<group>"; };
+		AA801F282EDA34F7008E4FAD /* foo_sample.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foo_sample.xcodeproj; sourceTree = "<group>"; };
+		AA801F432EDA34F7008E4FAD /* foobar2000_component_client.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foobar2000_component_client.xcodeproj; sourceTree = "<group>"; };
+		AA801F852EDA34F7008E4FAD /* foobar2000_SDK_helpers.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foobar2000_SDK_helpers.xcodeproj; sourceTree = "<group>"; };
+		AA8020462EDA34F7008E4FAD /* foobar2000_SDK.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foobar2000_SDK.xcodeproj; sourceTree = "<group>"; };
+		AA8020CD2EDA34F7008E4FAD /* shared.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = shared.xcodeproj; sourceTree = "<group>"; };
+		AA80217F2EDA34F7008E4FAD /* pfc.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = pfc.xcodeproj; sourceTree = "<group>"; };
+		AA8022042EDA34F7008E4FAD /* pugixml.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = pugixml.xcodeproj; sourceTree = "<group>"; };
+		AA8A55EE2EDA379A000192C9 /* foo_sample.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foo_sample.xcodeproj; sourceTree = "<group>"; };
+		AA8A56092EDA379A000192C9 /* foobar2000_component_client.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foobar2000_component_client.xcodeproj; sourceTree = "<group>"; };
+		AA8A564B2EDA379A000192C9 /* foobar2000_SDK_helpers.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foobar2000_SDK_helpers.xcodeproj; sourceTree = "<group>"; };
+		AA8A570C2EDA379A000192C9 /* foobar2000_SDK.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = foobar2000_SDK.xcodeproj; sourceTree = "<group>"; };
+		AA8A57932EDA379A000192C9 /* shared.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = shared.xcodeproj; sourceTree = "<group>"; };
+		AA8A58452EDA379A000192C9 /* pfc.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = pfc.xcodeproj; sourceTree = "<group>"; };
+		AA8A58CA2EDA379A000192C9 /* pugixml.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = pugixml.xcodeproj; sourceTree = "<group>"; };
 		AA9320982E2B1FCB00559177 /* wac.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = wac.xml; sourceTree = "<group>"; };
+		AACJSON0002 /* cJSON.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = cJSON.c; sourceTree = "<group>"; };
+		AACJSON0003 /* cJSON.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = cJSON.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -106,11 +238,10 @@
 		0F1FDDA42AA0AD9B00DE8967 = {
 			isa = PBXGroup;
 			children = (
+				AACJSON0002 /* cJSON.c */,
+				AACJSON0003 /* cJSON.h */,
 				AA9320982E2B1FCB00559177 /* wac.xml */,
 				0FBE14592AA1F74200B1F71E /* contextmenu.cpp */,
-				0FBE145B2AA1F74200B1F71E /* decode.cpp */,
-				0FD323BF2AA3C45C00C0C2F7 /* dsp_sample.h */,
-				0FBE145C2AA1F74200B1F71E /* dsp_sample.cpp */,
 				0F7F817F2AB87BA70051262F /* foobar2000-mac-class-suffix.h */,
 				0F1FDDBC2AA0AE1E00DE8967 /* Frameworks */,
 				0FBE14362AA1E85F00B1F71E /* helpers-mac */,
@@ -188,6 +319,120 @@
 			path = Mac;
 			sourceTree = "<group>";
 		};
+		AA8029332EDA34F7008E4FAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA80311B2EDA34F8008E4FAD /* libfoobar2000_SDK.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8029352EDA34F7008E4FAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8031182EDA34F8008E4FAD /* libfoobar2000_component_client.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8029372EDA34F7008E4FAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA80312A2EDA34F8008E4FAD /* libshared.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8029392EDA34F7008E4FAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA80311E2EDA34F8008E4FAD /* libfoobar2000_SDK_helpers.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA80293B2EDA34F7008E4FAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8031272EDA34F8008E4FAD /* libpugixmld.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA80293D2EDA34F7008E4FAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8031152EDA34F8008E4FAD /* foo_sample.component */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA80293F2EDA34F7008E4FAD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8031222EDA34F8008E4FAD /* libpfc-Mac.a */,
+				AA8031242EDA34F8008E4FAD /* libpfc-iOS.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8A5FF82EDA379A000192C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8A68012EDA37AD000192C9 /* libpfc-Mac.a */,
+				AA8A68032EDA37AD000192C9 /* libpfc-iOS.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8A5FFA2EDA379A000192C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8A68092EDA37AD000192C9 /* libshared.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8A5FFC2EDA379A000192C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8A67FD2EDA37AD000192C9 /* libfoobar2000_SDK_helpers.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8A5FFE2EDA379A000192C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8A68062EDA37AD000192C9 /* libpugixmld.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8A60002EDA379A000192C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8A67FA2EDA37AD000192C9 /* libfoobar2000_SDK.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8A60022EDA379A000192C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8A67F72EDA37AD000192C9 /* libfoobar2000_component_client.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA8A60042EDA379A000192C9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA8A67F42EDA37AD000192C9 /* foo_sample.component */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -233,6 +478,64 @@
 			mainGroup = 0F1FDDA42AA0AD9B00DE8967;
 			productRefGroup = 0F1FDDAE2AA0AD9B00DE8967 /* Products */;
 			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = AA80293D2EDA34F7008E4FAD /* Products */;
+					ProjectRef = AA801F282EDA34F7008E4FAD /* foo_sample.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8A60042EDA379A000192C9 /* Products */;
+					ProjectRef = AA8A55EE2EDA379A000192C9 /* foo_sample.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8A60022EDA379A000192C9 /* Products */;
+					ProjectRef = AA8A56092EDA379A000192C9 /* foobar2000_component_client.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8029352EDA34F7008E4FAD /* Products */;
+					ProjectRef = AA801F432EDA34F7008E4FAD /* foobar2000_component_client.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8A60002EDA379A000192C9 /* Products */;
+					ProjectRef = AA8A570C2EDA379A000192C9 /* foobar2000_SDK.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8029332EDA34F7008E4FAD /* Products */;
+					ProjectRef = AA8020462EDA34F7008E4FAD /* foobar2000_SDK.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8029392EDA34F7008E4FAD /* Products */;
+					ProjectRef = AA801F852EDA34F7008E4FAD /* foobar2000_SDK_helpers.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8A5FFC2EDA379A000192C9 /* Products */;
+					ProjectRef = AA8A564B2EDA379A000192C9 /* foobar2000_SDK_helpers.xcodeproj */;
+				},
+				{
+					ProductGroup = AA80293F2EDA34F7008E4FAD /* Products */;
+					ProjectRef = AA80217F2EDA34F7008E4FAD /* pfc.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8A5FF82EDA379A000192C9 /* Products */;
+					ProjectRef = AA8A58452EDA379A000192C9 /* pfc.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8A5FFE2EDA379A000192C9 /* Products */;
+					ProjectRef = AA8A58CA2EDA379A000192C9 /* pugixml.xcodeproj */;
+				},
+				{
+					ProductGroup = AA80293B2EDA34F7008E4FAD /* Products */;
+					ProjectRef = AA8022042EDA34F7008E4FAD /* pugixml.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8029372EDA34F7008E4FAD /* Products */;
+					ProjectRef = AA8020CD2EDA34F7008E4FAD /* shared.xcodeproj */;
+				},
+				{
+					ProductGroup = AA8A5FFA2EDA379A000192C9 /* Products */;
+					ProjectRef = AA8A57932EDA379A000192C9 /* shared.xcodeproj */;
+				},
+			);
 			projectRoot = "";
 			targets = (
 				0F1FDDAC2AA0AD9B00DE8967 /* foo_sample */,
@@ -240,13 +543,127 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXReferenceProxy section */
+		AA8031152EDA34F8008E4FAD /* foo_sample.component */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.cfbundle;
+			path = foo_sample.component;
+			remoteRef = AA8031142EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8031182EDA34F8008E4FAD /* libfoobar2000_component_client.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libfoobar2000_component_client.a;
+			remoteRef = AA8031172EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA80311B2EDA34F8008E4FAD /* libfoobar2000_SDK.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libfoobar2000_SDK.a;
+			remoteRef = AA80311A2EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA80311E2EDA34F8008E4FAD /* libfoobar2000_SDK_helpers.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libfoobar2000_SDK_helpers.a;
+			remoteRef = AA80311D2EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8031222EDA34F8008E4FAD /* libpfc-Mac.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libpfc-Mac.a";
+			remoteRef = AA8031212EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8031242EDA34F8008E4FAD /* libpfc-iOS.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libpfc-iOS.a";
+			remoteRef = AA8031232EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8031272EDA34F8008E4FAD /* libpugixmld.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libpugixmld.a;
+			remoteRef = AA8031262EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA80312A2EDA34F8008E4FAD /* libshared.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libshared.a;
+			remoteRef = AA8031292EDA34F8008E4FAD /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A67F42EDA37AD000192C9 /* foo_sample.component */ = {
+			isa = PBXReferenceProxy;
+			fileType = wrapper.cfbundle;
+			path = foo_sample.component;
+			remoteRef = AA8A67F32EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A67F72EDA37AD000192C9 /* libfoobar2000_component_client.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libfoobar2000_component_client.a;
+			remoteRef = AA8A67F62EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A67FA2EDA37AD000192C9 /* libfoobar2000_SDK.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libfoobar2000_SDK.a;
+			remoteRef = AA8A67F92EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A67FD2EDA37AD000192C9 /* libfoobar2000_SDK_helpers.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libfoobar2000_SDK_helpers.a;
+			remoteRef = AA8A67FC2EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A68012EDA37AD000192C9 /* libpfc-Mac.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libpfc-Mac.a";
+			remoteRef = AA8A68002EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A68032EDA37AD000192C9 /* libpfc-iOS.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = "libpfc-iOS.a";
+			remoteRef = AA8A68022EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A68062EDA37AD000192C9 /* libpugixmld.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libpugixmld.a;
+			remoteRef = AA8A68052EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		AA8A68092EDA37AD000192C9 /* libshared.a */ = {
+			isa = PBXReferenceProxy;
+			fileType = archive.ar;
+			path = libshared.a;
+			remoteRef = AA8A68082EDA37AD000192C9 /* PBXContainerItemProxy */;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+/* End PBXReferenceProxy section */
+
 /* Begin PBXResourcesBuildPhase section */
 		0F1FDDAB2AA0AD9B00DE8967 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				0FBE14562AA1E8C800B1F71E /* fooSampleMacPreferences.xib in Resources */,
-				0FCA71152AA21F69001CB0F2 /* fooSampleDSPView.xib in Resources */,
 				AA9320992E2B1FCB00559177 /* wac.xml in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -259,22 +676,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA36E9232E2A9D7D00E02194 /* pugixml.cpp in Sources */,
-				0FBE14692AA1F74200B1F71E /* IO.cpp in Sources */,
 				0FBE14552AA1E8C800B1F71E /* fooSampleMacPreferences.mm in Sources */,
-				0FBE14672AA1F74200B1F71E /* mainmenu-dynamic.cpp in Sources */,
 				0FBE14512AA1E85F00B1F71E /* NSView+embed.m in Sources */,
 				0FBE14632AA1F74200B1F71E /* contextmenu.cpp in Sources */,
-				0FCA71142AA21F69001CB0F2 /* fooSampleDSPView.mm in Sources */,
-				0FBE14652AA1F74200B1F71E /* decode.cpp in Sources */,
 				0F6D10F12AA3C35C00774EED /* fooDecibelFormatter.m in Sources */,
-				0FBE146C2AA1FF1500B1F71E /* ui_and_threads.cpp in Sources */,
-				0FBE14662AA1F74200B1F71E /* dsp_sample.cpp in Sources */,
 				0F1FDDBB2AA0ADDF00DE8967 /* main.cpp in Sources */,
-				0FBE14642AA1F74200B1F71E /* input_raw.cpp in Sources */,
 				0F62440A2AA1E59E004FEC96 /* preferences.cpp in Sources */,
 				0F1FDDBA2AA0ADDF00DE8967 /* initquit.cpp in Sources */,
-				0FBE14622AA1F74200B1F71E /* rating.cpp in Sources */,
-				0FBE146A2AA1F74200B1F71E /* playback_stream_capture.cpp in Sources */,
+				AACJSON0001 /* cJSON.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

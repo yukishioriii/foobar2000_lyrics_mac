@@ -19,10 +19,4 @@
    <FileRef
       location = "group:../../pfc/pfc.xcodeproj">
    </FileRef>
-   <FileRef
-      location = "group:log">
-   </FileRef>
-   <FileRef
-      location = "absolute:/Users/ando/work/baking/foo_openlyrics">
-   </FileRef>
 </Workspace>

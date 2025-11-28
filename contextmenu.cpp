@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include <curl/curl.h>
 #include <pugixml.hpp>
+#include "cJSON.h"
 
 #include <tidy.h>
 #include <tidybuffio.h>
@@ -14,6 +15,7 @@
 
 #include <iostream>
 #include <regex>
+#include <vector>
 
 // Identifier of our context menu group. Substitute with your own when reusing code.
 static const GUID guid_mygroup = { 0x572de7f4, 0xcbdf, 0x479a, { 0x97, 0x26, 0xa, 0xb0, 0x97, 0x47, 0x69, 0xe3 } };
@@ -27,6 +29,10 @@ static contextmenu_group_popup_factory g_mygroup(guid_mygroup, contextmenu_group
 static void RunTestCommand(metadb_handle_list_cref data);
 
 static void RunWack(metadb_handle_list_cref data);
+
+static void RunQQMusic(metadb_handle_list_cref data);
+
+metadb_v2_rec_t get_full_metadata(metadb_handle_ptr track);
 
 void RunCalculatePeak(metadb_handle_list_cref data); //decode.cpp
 
@@ -73,6 +79,7 @@ class myitem : public contextmenu_item_simple {
     enum {
         cmd_test1 = 0,
         wack,
+        qqmusic,
         cmd_total
     };
     GUID get_parent() {return guid_mygroup;}
@@ -80,7 +87,8 @@ class myitem : public contextmenu_item_simple {
     void get_item_name(unsigned p_index,pfc::string_base & p_out) {
         switch(p_index) {
             case cmd_test1: p_out = "ignored"; break;
-            case wack: p_out = "Lyrics pls"; break;
+            case wack: p_out = "AZLyrics"; break;
+            case qqmusic: p_out = "QQ Music"; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
     }
@@ -91,6 +99,9 @@ class myitem : public contextmenu_item_simple {
                 break;
             case wack:
                 RunWack(p_data);
+                break;
+            case qqmusic:
+                RunQQMusic(p_data);
                 break;
             default:
                 uBugCheck();
@@ -114,13 +125,15 @@ class myitem : public contextmenu_item_simple {
         // These GUIDs identify our context menu items. Substitute with your own GUIDs when reusing code.
         static const GUID guid_test1 = { 0x4021c80d, 0x9340, 0x423b, { 0xa3, 0xe2, 0x8e, 0x1e, 0xda, 0x87, 0x13, 0x7f } };
         static const GUID guid_wack = { 0x4021c79d, 0x9340, 0x423b, { 0xa3, 0xe2, 0x8e, 0x1e, 0xda, 0x87, 0x13, 0x7f } };
-        
+        static const GUID guid_qqmusic = { 0x5b32d81e, 0xa451, 0x4c9a, { 0xb4, 0xf3, 0x9f, 0x2f, 0xeb, 0x98, 0x24, 0x8c } };
+
         switch(p_index) {
             case cmd_test1: return guid_test1;
             case wack: return guid_wack;
+            case qqmusic: return guid_qqmusic;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
-        
+
     }
     bool get_item_description(unsigned p_index,pfc::string_base & p_out) {
         switch(p_index) {
@@ -128,7 +141,10 @@ class myitem : public contextmenu_item_simple {
                 p_out = "This is a sample command.";
                 return true;
             case wack:
-                p_out = "guh.";
+                p_out = "Search lyrics on AZLyrics.com";
+                return true;
+            case qqmusic:
+                p_out = "Search lyrics on QQ Music (synced lyrics)";
                 return true;
             default:
                 uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
@@ -383,7 +399,70 @@ std::string remove_chars_for_url( std::string_view input) {
     std::transform(data.begin(), data.end(), data.begin(),
                    [](unsigned char c){ return std::tolower(c); });
     std::string result = std::regex_replace(std::string(data).c_str(), r, "");
-    
+
+    return result;
+}
+
+static std::string base64_decode(const std::string& encoded) {
+    static const std::string base64_chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    std::string decoded;
+    std::vector<int> T(256, -1);
+    for (int i = 0; i < 64; i++) {
+        T[base64_chars[i]] = i;
+    }
+
+    int val = 0, valb = -8;
+    for (unsigned char c : encoded) {
+        if (T[c] == -1) break;
+        val = (val << 6) + T[c];
+        valb += 6;
+        if (valb >= 0) {
+            decoded.push_back(char((val >> valb) & 0xFF));
+            valb -= 8;
+        }
+    }
+    return decoded;
+}
+
+static bool is_ascii_alphanumeric(char c) {
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+}
+
+static std::string urlencode(std::string_view input)
+{
+    size_t inlen = input.length();
+    std::string result;
+    result.reserve(inlen * 3);
+
+    for(size_t i = 0; i < inlen; i++)
+    {
+        if(is_ascii_alphanumeric(input[i]) || (input[i] == '-') || (input[i] == '_') || (input[i] == '.')
+           || (input[i] == '~'))
+        {
+            result += input[i];
+        }
+        else if(input[i] == ' ')
+        {
+            result += "%20";
+        }
+        else
+        {
+            const auto nibble_to_hex = [](char c)
+            {
+                static char hex[] = "0123456789ABCDEF";
+                return hex[c & 0xF];
+            };
+
+            char hi_nibble = ((input[i] >> 4) & 0xF);
+            char lo_nibble = (input[i] & 0xF);
+            result += '%';
+            result += nibble_to_hex(hi_nibble);
+            result += nibble_to_hex(lo_nibble);
+        }
+    }
+
     return result;
 }
 
@@ -423,11 +502,181 @@ static void azlyrics_search(const metadb_v2_rec_t& track_info, pfc::string_forma
         }
         message << lyric_text.c_str() << "\n";
         //        console::print(lyric_text.c_str());
-        
+
         //        message << readBuffer.c_str() << "\n";
     }
 }
 
+
+static std::string qqmusic_lookup(const std::string& song_mid, pfc::string_formatter& message) {
+    CURL *curl;
+    CURLcode res;
+    std::string readBuffer;
+    std::string lyrics;
+
+    curl = curl_easy_init();
+    if (curl) {
+        std::string url = "http://c.y.qq.com/lyric/fcgi-bin/"
+                          "fcg_query_lyric_new.fcg?g_tk=5381&format=json&inCharset=utf-8&outCharset=utf-8&songmid="
+                          + song_mid;
+
+        message << "Fetching lyrics from: " << url.c_str() << "\n";
+
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Referer: http://y.qq.com/portal/player.html");
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        res = curl_easy_perform(curl);
+
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+
+        if (res == CURLE_OK) {
+            cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
+            if (json != nullptr && json->type == cJSON_Object) {
+                cJSON* lyric_item = cJSON_GetObjectItem(json, "lyric");
+                if (lyric_item != nullptr && lyric_item->type == cJSON_String) {
+                    // Decode base64 lyrics
+                    lyrics = base64_decode(lyric_item->valuestring);
+                }
+            }
+            cJSON_Delete(json);
+        }
+    }
+
+    return lyrics;
+}
+
+
+static void qqmusic_search(const metadb_v2_rec_t& track_info, pfc::string_formatter& message) {
+    CURL *curl;
+    CURLcode res;
+    std::string readBuffer;
+
+    curl = curl_easy_init();
+    if (curl) {
+        std::string artist = track_metadata(track_info, "artist");
+        std::string title = track_metadata(track_info, "title");
+
+        std::string url = "https://c.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg?inCharset=utf-8&outCharset=utf-8&key="
+                          + urlencode(artist) + '+' + urlencode(title);
+
+        message << "Searching QQ Music: " << url.c_str() << "\n";
+
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Referer: http://y.qq.com/portal/player.html");
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        res = curl_easy_perform(curl);
+
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+
+        if (res != CURLE_OK) {
+            message << "CURL error: " << curl_easy_strerror(res) << "\n";
+            return;
+        }
+
+        // Parse JSON response to get song ID
+        cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
+        if (json == nullptr || json->type != cJSON_Object) {
+            message << "Failed to parse JSON response\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        cJSON* data_obj = cJSON_GetObjectItem(json, "data");
+        if (data_obj == nullptr || data_obj->type != cJSON_Object) {
+            message << "No 'data' in response\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        cJSON* song_obj = cJSON_GetObjectItem(data_obj, "song");
+        if (song_obj == nullptr || song_obj->type != cJSON_Object) {
+            message << "No 'song' in response\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        cJSON* song_arr = cJSON_GetObjectItem(song_obj, "itemlist");
+        if (song_arr == nullptr || song_arr->type != cJSON_Array) {
+            message << "No 'itemlist' in response\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        int song_count = cJSON_GetArraySize(song_arr);
+        if (song_count <= 0) {
+            message << "No songs found\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        // Get first song result
+        cJSON* song_item = cJSON_GetArrayItem(song_arr, 0);
+        if (song_item == nullptr || song_item->type != cJSON_Object) {
+            message << "Invalid song item\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        // Get song mid (ID)
+        cJSON* mid_item = cJSON_GetObjectItem(song_item, "mid");
+        if (mid_item == nullptr || mid_item->type != cJSON_String) {
+            message << "No song mid found\n";
+            cJSON_Delete(json);
+            return;
+        }
+
+        std::string song_mid = mid_item->valuestring;
+
+        // Get song info for display
+        cJSON* singer_item = cJSON_GetObjectItem(song_item, "singer");
+        cJSON* name_item = cJSON_GetObjectItem(song_item, "name");
+
+        if (singer_item && singer_item->type == cJSON_String) {
+            message << "Artist: " << singer_item->valuestring << "\n";
+        }
+        if (name_item && name_item->type == cJSON_String) {
+            message << "Title: " << name_item->valuestring << "\n";
+        }
+        message << "Song ID: " << song_mid.c_str() << "\n\n";
+
+        cJSON_Delete(json);
+
+        // Now lookup the lyrics using the song mid
+        std::string lyrics = qqmusic_lookup(song_mid, message);
+        if (!lyrics.empty()) {
+            message << "--- Lyrics ---\n" << lyrics.c_str() << "\n";
+        } else {
+            message << "No lyrics found for this song\n";
+        }
+    }
+}
+
+
+static void RunQQMusic(metadb_handle_list_cref data) {
+    pfc::string_formatter message;
+
+    if (data.get_count() == 0) {
+        message << "No track selected\n";
+        popup_message::g_show(message, "QQ Music Lyrics");
+        return;
+    }
+
+    metadb_handle_ptr track = data.get_item(0);
+    const metadb_v2_rec_t track_info = get_full_metadata(track);
+    qqmusic_search(track_info, message);
+
+    popup_message::g_show(message, "QQ Music Lyrics");
+}
 
 
 metadb_v2_rec_t get_full_metadata(metadb_handle_ptr track)
