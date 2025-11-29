@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "../SDK/console_manager.h"
 #include <curl/curl.h>
 #include <pugixml.hpp>
 #include "cJSON.h"
@@ -149,7 +150,7 @@ static void RunAutoSearch(metadb_handle_list_cref data);
 
 static void RunFromFile(metadb_handle_list_cref data);
 
-static void RunAutoSearchSaveFile(metadb_handle_list_cref data);
+static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup = true);
 
 static void RunAutoSearchSaveTag(metadb_handle_list_cref data);
 
@@ -205,6 +206,7 @@ class myitem : public contextmenu_item_simple {
     enum {
 //        wack = 0,
         autosearch_save_file,
+        autosearch_save_file_silent,
 //        autosearch = 0,
         qqmusic,
         netease,
@@ -226,6 +228,7 @@ class myitem : public contextmenu_item_simple {
 //            case autosearch: p_out = "Auto Search (Best Match)"; break;
 //            case fromfile: p_out = "From File Metadata"; break;
             case autosearch_save_file: p_out = "Search & Save to .lrc"; break;
+            case autosearch_save_file_silent: p_out = "Search & Save to .lrc (Silent)"; break;
 //            case autosearch_save_tag: p_out = "Auto Search & Save to Tag"; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
@@ -254,7 +257,10 @@ class myitem : public contextmenu_item_simple {
 //                RunFromFile(p_data);
 //                break;
             case autosearch_save_file:
-                RunAutoSearchSaveFile(p_data);
+                RunAutoSearchSaveFile(p_data, true);
+                break;
+            case autosearch_save_file_silent:
+                RunAutoSearchSaveFile(p_data, false);
                 break;
 //            case autosearch_save_tag:
 //                RunAutoSearchSaveTag(p_data);
@@ -275,8 +281,11 @@ class myitem : public contextmenu_item_simple {
         static const GUID guid_autosearch_save_file = { 0xb198fe74, 0x0ab7, 0x4cf0, { 0x1a, 0x59, 0xf5, 0x95, 0x41, 0xfe, 0x8a, 0xe2 } };
         static const GUID guid_autosearch_save_tag = { 0xc2a9ff85, 0x1bc8, 0x4d01, { 0x2b, 0x6a, 0x06, 0xa6, 0x52, 0x0f, 0x9b, 0xf3 } };
 
+        static const GUID guid_autosearch_save_file_silent = { 0xd3baffa6, 0x2cd9, 0x4e12, { 0x3c, 0x7b, 0x17, 0xb7, 0x63, 0x10, 0xac, 0x04 } };
+
         switch(p_index) {
             case autosearch_save_file: return guid_autosearch_save_file;
+            case autosearch_save_file_silent: return guid_autosearch_save_file_silent;
 //            case wack: return guid_wack;
             case qqmusic: return guid_qqmusic;
             case netease: return guid_netease;
@@ -314,6 +323,9 @@ class myitem : public contextmenu_item_simple {
 //                return true;
             case autosearch_save_file:
                 p_out = "Search all sources and save to .lrc file";
+                return true;
+            case autosearch_save_file_silent:
+                p_out = "Search all sources and save to .lrc file (console output only)";
                 return true;
 //            case autosearch_save_tag:
 //                p_out = "Search all sources and save to LYRICS tag";
@@ -2026,12 +2038,17 @@ static bool save_lyrics_to_tag(metadb_handle_ptr track, const std::string& lyric
 
 
 // Auto search and save to .lrc file
-static void RunAutoSearchSaveFile(metadb_handle_list_cref data) {
+static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup) {
     pfc::string_formatter message;
 
     if (data.get_count() == 0) {
         message << "No track selected\n";
-        popup_message::g_show(message, "Auto Search & Save");
+        if (show_popup) {
+            popup_message::g_show(message, "Auto Search & Save");
+        } else {
+            console::clearBacklog();
+            FB2K_console_formatter() << "[Lyrics] " << message;
+        }
         return;
     }
 
@@ -2053,10 +2070,13 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data) {
             message << "\n--- Lyrics Preview ---\n";
         }
         message << lyrics.c_str();
-
     }
 
-    popup_message::g_show(message, "Auto Search & Save to File");
+    if (show_popup) {
+        popup_message::g_show(message, "Auto Search & Save to File");
+    } else {
+        FB2K_console_formatter() << "[Lyrics] " << message;
+    }
 }
 
 
