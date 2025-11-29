@@ -203,38 +203,38 @@ class myitem : public contextmenu_item_simple {
     typedef contextmenu_item_simple super_t;
     public:
     enum {
-        wack = 0,
+//        wack = 0,
+        autosearch_save_file,
+//        autosearch = 0,
         qqmusic,
         netease,
         musixmatch,
         songlyrics,
-        autosearch,
-        fromfile,
-        autosearch_save_file,
-        autosearch_save_tag,
+//        fromfile,
+//        autosearch_save_tag,
         cmd_total
     };
     GUID get_parent() {return guid_mygroup;}
     unsigned get_num_items() {return cmd_total;}
     void get_item_name(unsigned p_index,pfc::string_base & p_out) {
         switch(p_index) {
-            case wack: p_out = "AZLyrics"; break;
+//            case wack: p_out = "AZLyrics"; break;
             case qqmusic: p_out = "QQ Music"; break;
             case netease: p_out = "NetEase"; break;
             case musixmatch: p_out = "Musixmatch"; break;
             case songlyrics: p_out = "SongLyrics"; break;
-            case autosearch: p_out = "Auto Search (Best Match)"; break;
-            case fromfile: p_out = "From File Metadata"; break;
-            case autosearch_save_file: p_out = "Auto Search & Save to .lrc"; break;
-            case autosearch_save_tag: p_out = "Auto Search & Save to Tag"; break;
+//            case autosearch: p_out = "Auto Search (Best Match)"; break;
+//            case fromfile: p_out = "From File Metadata"; break;
+            case autosearch_save_file: p_out = "Search & Save to .lrc"; break;
+//            case autosearch_save_tag: p_out = "Auto Search & Save to Tag"; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
     }
     void context_command(unsigned p_index,metadb_handle_list_cref p_data,const GUID& p_caller) {
         switch(p_index) {
-            case wack:
-                RunWack(p_data);
-                break;
+//            case wack:
+//                RunWack(p_data);
+//                break;
             case qqmusic:
                 RunQQMusic(p_data);
                 break;
@@ -247,18 +247,18 @@ class myitem : public contextmenu_item_simple {
             case songlyrics:
                 RunSongLyrics(p_data);
                 break;
-            case autosearch:
-                RunAutoSearch(p_data);
-                break;
-            case fromfile:
-                RunFromFile(p_data);
-                break;
+//            case autosearch:
+//                RunAutoSearch(p_data);
+//                break;
+//            case fromfile:
+//                RunFromFile(p_data);
+//                break;
             case autosearch_save_file:
                 RunAutoSearchSaveFile(p_data);
                 break;
-            case autosearch_save_tag:
-                RunAutoSearchSaveTag(p_data);
-                break;
+//            case autosearch_save_tag:
+//                RunAutoSearchSaveTag(p_data);
+//                break;
             default:
                 uBugCheck();
         }
@@ -277,23 +277,23 @@ class myitem : public contextmenu_item_simple {
 
         switch(p_index) {
             case autosearch_save_file: return guid_autosearch_save_file;
-            case wack: return guid_wack;
+//            case wack: return guid_wack;
             case qqmusic: return guid_qqmusic;
             case netease: return guid_netease;
             case musixmatch: return guid_musixmatch;
             case songlyrics: return guid_songlyrics;
-            case autosearch: return guid_autosearch;
-            case fromfile: return guid_fromfile;
-            case autosearch_save_tag: return guid_autosearch_save_tag;
+//            case autosearch: return guid_autosearch;
+//            case fromfile: return guid_fromfile;
+//            case autosearch_save_tag: return guid_autosearch_save_tag;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
 
     }
     bool get_item_description(unsigned p_index,pfc::string_base & p_out) {
         switch(p_index) {
-            case wack:
-                p_out = "Search lyrics on AZLyrics.com";
-                return true;
+//            case wack:
+//                p_out = "Search lyrics on AZLyrics.com";
+//                return true;
             case qqmusic:
                 p_out = "Search lyrics on QQ Music (synced lyrics)";
                 return true;
@@ -306,18 +306,18 @@ class myitem : public contextmenu_item_simple {
             case songlyrics:
                 p_out = "Search lyrics on SongLyrics.com";
                 return true;
-            case autosearch:
-                p_out = "Search all sources and return the best match";
-                return true;
-            case fromfile:
-                p_out = "Extract lyrics from file metadata tags";
-                return true;
+//            case autosearch:
+//                p_out = "Search all sources and return the best match";
+//                return true;
+//            case fromfile:
+//                p_out = "Extract lyrics from file metadata tags";
+//                return true;
             case autosearch_save_file:
                 p_out = "Search all sources and save to .lrc file";
                 return true;
-            case autosearch_save_tag:
-                p_out = "Search all sources and save to LYRICS tag";
-                return true;
+//            case autosearch_save_tag:
+//                p_out = "Search all sources and save to LYRICS tag";
+//                return true;
             default:
                 uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
@@ -2045,13 +2045,15 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data) {
     } else {
         message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
 
-        if (save_lyrics_to_file(track, lyrics, message)) {
-            message << "\n--- Lyrics Preview (first 500 chars) ---\n";
-            message << lyrics.substr(0, 500).c_str();
-            if (lyrics.length() > 500) {
-                message << "\n... [truncated]";
-            }
+        // Don't overwrite if lyrics came from cache (file or tag)
+        bool is_cached = source_name.find("(cached)") != std::string::npos;
+        if (is_cached) {
+            message << "Lyrics already cached, skipping save.\n";
+        } else if (save_lyrics_to_file(track, lyrics, message)) {
+            message << "\n--- Lyrics Preview ---\n";
         }
+        message << lyrics.c_str();
+
     }
 
     popup_message::g_show(message, "Auto Search & Save to File");
