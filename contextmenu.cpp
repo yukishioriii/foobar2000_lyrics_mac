@@ -205,8 +205,8 @@ class myitem : public contextmenu_item_simple {
     public:
     enum {
 //        wack = 0,
-        autosearch_save_file,
         autosearch_save_file_silent,
+        autosearch_save_file,
 //        autosearch = 0,
         qqmusic,
         netease,
@@ -227,8 +227,8 @@ class myitem : public contextmenu_item_simple {
             case songlyrics: p_out = "SongLyrics"; break;
 //            case autosearch: p_out = "Auto Search (Best Match)"; break;
 //            case fromfile: p_out = "From File Metadata"; break;
-            case autosearch_save_file: p_out = "Search & Save to .lrc"; break;
-            case autosearch_save_file_silent: p_out = "Search & Save to .lrc (Silent)"; break;
+            case autosearch_save_file: p_out = "Search & Save"; break;
+            case autosearch_save_file_silent: p_out = "Search & Save (Silent)"; break;
 //            case autosearch_save_tag: p_out = "Auto Search & Save to Tag"; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
@@ -271,15 +271,15 @@ class myitem : public contextmenu_item_simple {
     }
     GUID get_item_guid(unsigned p_index) {
         // These GUIDs identify our context menu items. Substitute with your own GUIDs when reusing code.
-        static const GUID guid_wack = { 0x4021c79d, 0x9340, 0x423b, { 0xa3, 0xe2, 0x8e, 0x1e, 0xda, 0x87, 0x13, 0x7f } };
+//        static const GUID guid_wack = { 0x4021c79d, 0x9340, 0x423b, { 0xa3, 0xe2, 0x8e, 0x1e, 0xda, 0x87, 0x13, 0x7f } };
         static const GUID guid_qqmusic = { 0x5b32d81e, 0xa451, 0x4c9a, { 0xb4, 0xf3, 0x9f, 0x2f, 0xeb, 0x98, 0x24, 0x8c } };
         static const GUID guid_netease = { 0x6c43e92f, 0xb562, 0x4dab, { 0xc5, 0x04, 0xa0, 0x40, 0xfc, 0xa9, 0x35, 0x9d } };
         static const GUID guid_musixmatch = { 0x7d54fa30, 0xc673, 0x4ebc, { 0xd6, 0x15, 0xb1, 0x51, 0x0d, 0xba, 0x46, 0xae } };
         static const GUID guid_songlyrics = { 0x8e65fb41, 0xd784, 0x4fcd, { 0xe7, 0x26, 0xc2, 0x62, 0x1e, 0xcb, 0x57, 0xbf } };
-        static const GUID guid_autosearch = { 0x9f76fc52, 0xe895, 0x4ade, { 0xf8, 0x37, 0xd3, 0x73, 0x2f, 0xdc, 0x68, 0xc0 } };
-        static const GUID guid_fromfile = { 0xa087fd63, 0xf9a6, 0x4bef, { 0x09, 0x48, 0xe4, 0x84, 0x30, 0xed, 0x79, 0xd1 } };
+//        static const GUID guid_autosearch = { 0x9f76fc52, 0xe895, 0x4ade, { 0xf8, 0x37, 0xd3, 0x73, 0x2f, 0xdc, 0x68, 0xc0 } };
+//        static const GUID guid_fromfile = { 0xa087fd63, 0xf9a6, 0x4bef, { 0x09, 0x48, 0xe4, 0x84, 0x30, 0xed, 0x79, 0xd1 } };
         static const GUID guid_autosearch_save_file = { 0xb198fe74, 0x0ab7, 0x4cf0, { 0x1a, 0x59, 0xf5, 0x95, 0x41, 0xfe, 0x8a, 0xe2 } };
-        static const GUID guid_autosearch_save_tag = { 0xc2a9ff85, 0x1bc8, 0x4d01, { 0x2b, 0x6a, 0x06, 0xa6, 0x52, 0x0f, 0x9b, 0xf3 } };
+//        static const GUID guid_autosearch_save_tag = { 0xc2a9ff85, 0x1bc8, 0x4d01, { 0x2b, 0x6a, 0x06, 0xa6, 0x52, 0x0f, 0x9b, 0xf3 } };
 
         static const GUID guid_autosearch_save_file_silent = { 0xd3baffa6, 0x2cd9, 0x4e12, { 0x3c, 0x7b, 0x17, 0xb7, 0x63, 0x10, 0xac, 0x04 } };
 
@@ -2160,3 +2160,42 @@ static void RunWack(metadb_handle_list_cref data) {
     
     popup_message::g_show(message, "yeet");
 }
+
+// Playback callback to display cached lyrics when a new track starts
+class lyrics_playback_callback : public play_callback_static {
+public:
+    unsigned get_flags() override {
+        return flag_on_playback_new_track;
+    }
+
+    void on_playback_starting(play_control::t_track_command p_command, bool p_paused) override {
+        FB2K_console_formatter() << "[Lyrics] e";
+    }
+    void on_playback_stop(play_control::t_stop_reason p_reason) override {}
+    void on_playback_seek(double p_time) override {}
+    void on_playback_pause(bool p_state) override {}
+    void on_playback_edited(metadb_handle_ptr p_track) override {}
+    void on_playback_dynamic_info(const file_info& p_info) override {}
+    void on_playback_dynamic_info_track(const file_info& p_info) override {}
+    void on_playback_time(double p_time) override {}
+    void on_volume_change(float p_new_val) override {}
+
+    void on_playback_new_track(metadb_handle_ptr p_track) override {
+        const metadb_v2_rec_t track_info = get_full_metadata(p_track);
+        std::string artist = track_metadata(track_info, "artist");
+        std::string title = track_metadata(track_info, "title");
+
+        // Check for lyrics in metadata tags first, then files
+        std::string lyrics = get_cached_lyrics_from_tag(track_info);
+        if (lyrics.empty()) {
+            lyrics = get_cached_lyrics_from_file(p_track);
+        }
+
+        if (!lyrics.empty()) {
+            console::clearBacklog();
+            FB2K_console_formatter() << "[Lyrics] " << artist.c_str() << " - " << title.c_str() << "\n\n" << lyrics.c_str();
+        }
+    }
+};
+
+FB2K_SERVICE_FACTORY(lyrics_playback_callback);
