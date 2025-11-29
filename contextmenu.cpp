@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <utility>
 #include <unordered_map>
+#include <thread>
 
 // HTML entity decoder for cleaning lyrics
 static std::string decode_html_entities(const std::string& input) {
@@ -1720,29 +1721,33 @@ static std::string songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_in
     return lyrics;
 }
 
-// Auto search - iterate through all sources and return best match
+// Auto search - iterate through all sources and return best match (runs in background thread)
 static void RunAutoSearch(metadb_handle_list_cref data) {
-    pfc::string_formatter message;
-
     if (data.get_count() == 0) {
-        message << "No track selected\n";
-        popup_message::g_show(message, "Auto Search");
+        popup_message::g_show("No track selected", "Auto Search");
         return;
     }
 
     metadb_handle_ptr track = data.get_item(0);
     const metadb_v2_rec_t track_info = get_full_metadata(track);
 
-    auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
+    // Run search in background thread
+    std::thread([track, track_info]() {
+        pfc::string_formatter message;
+        auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
 
-    if (lyrics.empty()) {
-        message << "No lyrics found from any source.\n";
-    } else {
-        message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
-        message << "--- Lyrics ---\n" << lyrics.c_str() << "\n";
-    }
+        if (lyrics.empty()) {
+            message << "No lyrics found from any source.\n";
+        } else {
+            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
+            message << "--- Lyrics ---\n" << lyrics.c_str() << "\n";
+        }
 
-    popup_message::g_show(message, "Auto Search");
+        std::string result_msg(message.get_ptr());
+        fb2k::inMainThread([result_msg]() {
+            popup_message::g_show(result_msg.c_str(), "Auto Search");
+        });
+    }).detach();
 }
 
 
@@ -2037,17 +2042,11 @@ static bool save_lyrics_to_tag(metadb_handle_ptr track, const std::string& lyric
 }
 
 
-// Auto search and save to .lrc file
+// Auto search and save to .lrc file (runs in background thread)
 static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup) {
-    pfc::string_formatter message;
-
     if (data.get_count() == 0) {
-        message << "No track selected\n";
         if (show_popup) {
-            popup_message::g_show(message, "Auto Search & Save");
-        } else {
-            console::clearBacklog();
-            FB2K_console_formatter() << "[Lyrics] " << message;
+            popup_message::g_show("No track selected", "Auto Search & Save");
         }
         return;
     }
@@ -2055,61 +2054,77 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup)
     metadb_handle_ptr track = data.get_item(0);
     const metadb_v2_rec_t track_info = get_full_metadata(track);
 
-    auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
+    std::thread([track, track_info, show_popup]() {
+        pfc::string_formatter message;
+        auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
 
-    if (lyrics.empty()) {
-        message << "No lyrics found from any source.\n";
-    } else {
-        message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
+        if (lyrics.empty()) {
+            message << "No lyrics found from any source.\n";
+        } else {
+            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
 
-        // Don't overwrite if lyrics came from cache (file or tag)
-        bool is_cached = source_name.find("(cached)") != std::string::npos;
-        if (is_cached) {
-            message << "Lyrics already cached, skipping save.\n";
-        } else if (save_lyrics_to_file(track, lyrics, message)) {
-            message << "\n--- Lyrics Preview ---\n";
+            // Don't overwrite if lyrics came from cache (file or tag)
+            bool is_cached = source_name.find("(cached)") != std::string::npos;
+            if (is_cached) {
+                message << "Lyrics already cached, skipping save.\n";
+            } else if (save_lyrics_to_file(track, lyrics, message)) {
+                message << "\n--- Lyrics Preview ---\n";
+            }
+            message << lyrics.c_str();
         }
-        message << lyrics.c_str();
-    }
 
-    if (show_popup) {
-        popup_message::g_show(message, "Auto Search & Save to File");
-    } else {
-        FB2K_console_formatter() << "[Lyrics] " << message;
-    }
+        std::string result_msg(message.get_ptr());
+        if (show_popup) {
+            fb2k::inMainThread([result_msg]() {
+                popup_message::g_show(result_msg.c_str(), "Auto Search & Save to File");
+            });
+        } else {
+            fb2k::inMainThread([result_msg]() {
+                FB2K_console_formatter() << "[Lyrics] " << result_msg.c_str();
+            });
+        }
+    }).detach();
 }
 
 
-// Auto search and save to metadata tag
+// Auto search and save to metadata tag (runs in background thread)
 static void RunAutoSearchSaveTag(metadb_handle_list_cref data) {
-    pfc::string_formatter message;
-
     if (data.get_count() == 0) {
-        message << "No track selected\n";
-        popup_message::g_show(message, "Auto Search & Save");
+        popup_message::g_show("No track selected", "Auto Search & Save");
         return;
     }
 
     metadb_handle_ptr track = data.get_item(0);
     const metadb_v2_rec_t track_info = get_full_metadata(track);
 
-    auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
+    std::thread([track, track_info]() {
+        pfc::string_formatter message;
+        auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
 
-    if (lyrics.empty()) {
-        message << "No lyrics found from any source.\n";
-    } else {
-        message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
+        if (lyrics.empty()) {
+            message << "No lyrics found from any source.\n";
+        } else {
+            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
 
-        if (save_lyrics_to_tag(track, lyrics, message)) {
+            // save_lyrics_to_tag needs to run on main thread for metadb access
+            std::string lyrics_copy = lyrics;
+            fb2k::inMainThread([track, lyrics_copy]() {
+                pfc::string_formatter tag_message;
+                save_lyrics_to_tag(track, lyrics_copy, tag_message);
+            });
+
             message << "\n--- Lyrics Preview (first 500 chars) ---\n";
             message << lyrics.substr(0, 500).c_str();
             if (lyrics.length() > 500) {
                 message << "\n... [truncated]";
             }
         }
-    }
 
-    popup_message::g_show(message, "Auto Search & Save to Tag");
+        std::string result_msg(message.get_ptr());
+        fb2k::inMainThread([result_msg]() {
+            popup_message::g_show(result_msg.c_str(), "Auto Search & Save to Tag");
+        });
+    }).detach();
 }
 
 
