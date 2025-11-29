@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <utility>
 #include <unordered_map>
+#include <thread>
 
 // HTML entity decoder for cleaning lyrics
 static std::string decode_html_entities(const std::string& input) {
@@ -153,6 +154,8 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data);
 
 static void RunAutoSearchSaveTag(metadb_handle_list_cref data);
 
+static void RunManualSearch(metadb_handle_list_cref data);
+
 metadb_v2_rec_t get_full_metadata(metadb_handle_ptr track);
 
 static std::pair<std::string, std::string> auto_search_get_best_lyrics(
@@ -212,6 +215,7 @@ class myitem : public contextmenu_item_simple {
         fromfile,
         autosearch_save_file,
         autosearch_save_tag,
+        manualsearch,
         cmd_total
     };
     GUID get_parent() {return guid_mygroup;}
@@ -227,6 +231,7 @@ class myitem : public contextmenu_item_simple {
             case fromfile: p_out = "From File Metadata"; break;
             case autosearch_save_file: p_out = "Auto Search & Save to .lrc"; break;
             case autosearch_save_tag: p_out = "Auto Search & Save to Tag"; break;
+            case manualsearch: p_out = "Manual Search..."; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
     }
@@ -259,6 +264,9 @@ class myitem : public contextmenu_item_simple {
             case autosearch_save_tag:
                 RunAutoSearchSaveTag(p_data);
                 break;
+            case manualsearch:
+                RunManualSearch(p_data);
+                break;
             default:
                 uBugCheck();
         }
@@ -274,6 +282,7 @@ class myitem : public contextmenu_item_simple {
         static const GUID guid_fromfile = { 0xa087fd63, 0xf9a6, 0x4bef, { 0x09, 0x48, 0xe4, 0x84, 0x30, 0xed, 0x79, 0xd1 } };
         static const GUID guid_autosearch_save_file = { 0xb198fe74, 0x0ab7, 0x4cf0, { 0x1a, 0x59, 0xf5, 0x95, 0x41, 0xfe, 0x8a, 0xe2 } };
         static const GUID guid_autosearch_save_tag = { 0xc2a9ff85, 0x1bc8, 0x4d01, { 0x2b, 0x6a, 0x06, 0xa6, 0x52, 0x0f, 0x9b, 0xf3 } };
+        static const GUID guid_manualsearch = { 0xd3ba0096, 0x2cd9, 0x4e12, { 0x3c, 0x7b, 0x17, 0xb7, 0x63, 0x10, 0xac, 0x04 } };
 
         switch(p_index) {
             case autosearch_save_file: return guid_autosearch_save_file;
@@ -285,6 +294,7 @@ class myitem : public contextmenu_item_simple {
             case autosearch: return guid_autosearch;
             case fromfile: return guid_fromfile;
             case autosearch_save_tag: return guid_autosearch_save_tag;
+            case manualsearch: return guid_manualsearch;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
 
@@ -317,6 +327,9 @@ class myitem : public contextmenu_item_simple {
                 return true;
             case autosearch_save_tag:
                 p_out = "Search all sources and save to LYRICS tag";
+                return true;
+            case manualsearch:
+                p_out = "Manually enter artist/title to search lyrics";
                 return true;
             default:
                 uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
@@ -2088,6 +2101,438 @@ static void RunAutoSearchSaveTag(metadb_handle_list_cref data) {
     }
 
     popup_message::g_show(message, "Auto Search & Save to Tag");
+}
+
+
+// macOS input dialog using osascript
+static std::string macos_input_dialog(const std::string& prompt, const std::string& title, const std::string& default_value = "") {
+    // Escape double quotes for AppleScript
+    auto escape_for_applescript = [](const std::string& s) {
+        std::string result;
+        for (char c : s) {
+            if (c == '"') result += "\\\"";
+            else if (c == '\\') result += "\\\\";
+            else result += c;
+        }
+        return result;
+    };
+
+    std::string escaped_prompt = escape_for_applescript(prompt);
+    std::string escaped_title = escape_for_applescript(title);
+    std::string escaped_default = escape_for_applescript(default_value);
+
+    std::string script = "osascript -e 'display dialog \"" +
+                         escaped_prompt + "\" with title \"" + escaped_title +
+                         "\" default answer \"" + escaped_default +
+                         "\" buttons {\"Cancel\", \"OK\"} default button \"OK\"' -e 'text returned of result' 2>&1";
+
+    FILE* pipe = popen(script.c_str(), "r");
+    if (!pipe) return "";
+
+    char buffer[1024];
+    std::string result;
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        result += buffer;
+    }
+    int status = pclose(pipe);
+
+    // Remove trailing newline
+    while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+        result.pop_back();
+    }
+
+    // Check if user cancelled (osascript returns error on cancel)
+    if (status != 0 || result.find("User canceled") != std::string::npos ||
+        result.find("execution error") != std::string::npos) {
+        return "";
+    }
+
+    return result;
+}
+
+// Forward declare the search functions that take artist/title directly
+static std::string qqmusic_search_by_name(const std::string& artist, const std::string& title);
+static std::string netease_search_by_name(const std::string& artist, const std::string& title);
+static std::string musixmatch_search_by_name(const std::string& artist, const std::string& title);
+static std::string songlyrics_search_by_name(const std::string& artist, const std::string& title);
+
+// Helper: Search lyrics with manual input (artist, title)
+static std::pair<std::string, std::string> manual_search_lyrics(
+    const std::string& artist,
+    const std::string& title,
+    pfc::string_formatter& message) {
+
+    message << "Searching for: " << artist.c_str() << " - " << title.c_str() << "\n\n";
+    message << "=== Searching Online Sources ===\n";
+
+    std::vector<LyricsResult> results;
+
+    // QQ Music
+    message << "Searching QQ Music... ";
+    std::string qq_lyrics = qqmusic_search_by_name(artist, title);
+    if (!qq_lyrics.empty()) {
+        message << "FOUND (" << qq_lyrics.length() << " chars)\n";
+        results.push_back({"QQ Music", qq_lyrics, qq_lyrics.length()});
+    } else {
+        message << "not found\n";
+    }
+
+    // NetEase
+    message << "Searching NetEase... ";
+    std::string netease_lyrics = netease_search_by_name(artist, title);
+    if (!netease_lyrics.empty()) {
+        message << "FOUND (" << netease_lyrics.length() << " chars)\n";
+        results.push_back({"NetEase", netease_lyrics, netease_lyrics.length()});
+    } else {
+        message << "not found\n";
+    }
+
+    // Musixmatch
+    message << "Searching Musixmatch... ";
+    std::string musixmatch_lyrics = musixmatch_search_by_name(artist, title);
+    if (!musixmatch_lyrics.empty()) {
+        message << "FOUND (" << musixmatch_lyrics.length() << " chars)\n";
+        results.push_back({"Musixmatch", musixmatch_lyrics, musixmatch_lyrics.length()});
+    } else {
+        message << "not found\n";
+    }
+
+    // SongLyrics
+    message << "Searching SongLyrics... ";
+    std::string songlyrics_lyrics = songlyrics_search_by_name(artist, title);
+    if (!songlyrics_lyrics.empty()) {
+        message << "FOUND (" << songlyrics_lyrics.length() << " chars)\n";
+        results.push_back({"SongLyrics", songlyrics_lyrics, songlyrics_lyrics.length()});
+    } else {
+        message << "not found\n";
+    }
+
+    message << "\n";
+
+    if (results.empty()) {
+        return {"", ""};
+    }
+
+    // Find the result with the longest lyrics
+    auto best = std::max_element(results.begin(), results.end(),
+        [](const LyricsResult& a, const LyricsResult& b) {
+            return a.length < b.length;
+        });
+
+    return {decode_html_entities(best->lyrics), best->source_name};
+}
+
+// QQ Music search by artist/title directly
+static std::string qqmusic_search_by_name(const std::string& artist, const std::string& title) {
+    CURL *curl = curl_easy_init();
+    if (!curl) return "";
+
+    std::string readBuffer;
+    std::string url = "https://c.y.qq.com/splcloud/fcgi-bin/smartbox_new.fcg?inCharset=utf-8&outCharset=utf-8&key="
+                      + urlencode(artist) + '+' + urlencode(title);
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Referer: http://y.qq.com/portal/player.html");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+    CURLcode res = curl_easy_perform(curl);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) return "";
+
+    cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
+    if (!json) return "";
+
+    std::string song_mid;
+    cJSON* data_obj = cJSON_GetObjectItem(json, "data");
+    if (data_obj) {
+        cJSON* song_obj = cJSON_GetObjectItem(data_obj, "song");
+        if (song_obj) {
+            cJSON* song_arr = cJSON_GetObjectItem(song_obj, "itemlist");
+            if (song_arr && cJSON_GetArraySize(song_arr) > 0) {
+                cJSON* song_item = cJSON_GetArrayItem(song_arr, 0);
+                cJSON* mid_item = cJSON_GetObjectItem(song_item, "mid");
+                if (mid_item && mid_item->type == cJSON_String) {
+                    song_mid = mid_item->valuestring;
+                }
+            }
+        }
+    }
+    cJSON_Delete(json);
+
+    if (song_mid.empty()) return "";
+
+    pfc::string_formatter dummy;
+    return qqmusic_lookup(song_mid, dummy);
+}
+
+// NetEase search by artist/title directly
+static std::string netease_search_by_name(const std::string& artist, const std::string& title) {
+    CURL *curl = curl_easy_init();
+    if (!curl) return "";
+
+    std::string readBuffer;
+    std::string url = "https://music.163.com/api/search/get?s="
+                      + urlencode(artist) + '+' + urlencode(title)
+                      + "&type=1&limit=10";
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Referer: https://music.163.com/");
+    headers = curl_slist_append(headers, "User-Agent: Mozilla/5.0");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+    CURLcode res = curl_easy_perform(curl);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) return "";
+
+    cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
+    if (!json) return "";
+
+    std::string song_id;
+    cJSON* result_obj = cJSON_GetObjectItem(json, "result");
+    if (result_obj) {
+        cJSON* songs_arr = cJSON_GetObjectItem(result_obj, "songs");
+        if (songs_arr && cJSON_GetArraySize(songs_arr) > 0) {
+            cJSON* song_item = cJSON_GetArrayItem(songs_arr, 0);
+            cJSON* id_item = cJSON_GetObjectItem(song_item, "id");
+            if (id_item && id_item->type == cJSON_Number) {
+                song_id = std::to_string((int)id_item->valuedouble);
+            }
+        }
+    }
+    cJSON_Delete(json);
+
+    if (song_id.empty()) return "";
+
+    pfc::string_formatter dummy;
+    return netease_lookup(song_id, dummy);
+}
+
+// Musixmatch search by artist/title directly
+static std::string musixmatch_search_by_name(const std::string& artist, const std::string& title) {
+    // Get token if needed
+    if (g_musixmatch_token.empty()) {
+        pfc::string_formatter dummy;
+        g_musixmatch_token = musixmatch_get_token(dummy);
+    }
+    if (g_musixmatch_token.empty()) return "";
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return "";
+
+    std::string readBuffer;
+    std::string url = "https://apic-desktop.musixmatch.com/ws/1.1/track.search?"
+                      "app_id=web-desktop-app-v1.0"
+                      "&q_artist=" + urlencode(artist) +
+                      "&q_track=" + urlencode(title) +
+                      "&usertoken=" + g_musixmatch_token;
+
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Cookie: x-mxm-user-id=");
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+    CURLcode res = curl_easy_perform(curl);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) return "";
+
+    cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
+    if (!json) return "";
+
+    std::string track_id;
+    bool has_subtitles = false;
+    bool has_lyrics = false;
+
+    cJSON* message_obj = cJSON_GetObjectItem(json, "message");
+    if (message_obj) {
+        cJSON* body_obj = cJSON_GetObjectItem(message_obj, "body");
+        if (body_obj) {
+            cJSON* track_list = cJSON_GetObjectItem(body_obj, "track_list");
+            if (track_list && cJSON_GetArraySize(track_list) > 0) {
+                cJSON* track_item = cJSON_GetArrayItem(track_list, 0);
+                cJSON* track_obj = cJSON_GetObjectItem(track_item, "track");
+                if (track_obj) {
+                    cJSON* id_item = cJSON_GetObjectItem(track_obj, "track_id");
+                    if (id_item && id_item->type == cJSON_Number) {
+                        track_id = std::to_string((int)id_item->valuedouble);
+                    }
+                    cJSON* subtitles_item = cJSON_GetObjectItem(track_obj, "has_subtitles");
+                    if (subtitles_item) {
+                        has_subtitles = (subtitles_item->type == cJSON_True ||
+                                        (subtitles_item->type == cJSON_Number && subtitles_item->valueint == 1));
+                    }
+                    cJSON* lyrics_item = cJSON_GetObjectItem(track_obj, "has_lyrics");
+                    if (lyrics_item) {
+                        has_lyrics = (lyrics_item->type == cJSON_True ||
+                                     (lyrics_item->type == cJSON_Number && lyrics_item->valueint == 1));
+                    }
+                }
+            }
+        }
+    }
+    cJSON_Delete(json);
+
+    if (track_id.empty()) return "";
+
+    pfc::string_formatter dummy;
+    std::string lyrics;
+    if (has_subtitles) {
+        lyrics = musixmatch_lookup_synced(track_id, g_musixmatch_token, dummy);
+    }
+    if (lyrics.empty() && has_lyrics) {
+        lyrics = musixmatch_lookup_unsynced(track_id, g_musixmatch_token, dummy);
+    }
+    return lyrics;
+}
+
+// SongLyrics search by artist/title directly
+static std::string songlyrics_search_by_name(const std::string& artist, const std::string& title) {
+    std::string artist_clean = songlyrics_remove_chars_for_url(artist);
+    std::string title_clean = songlyrics_remove_chars_for_url(title);
+
+    std::string url = "https://www.songlyrics.com/" + artist_clean + "/" + title_clean + "-lyrics/";
+
+    CURL *curl = curl_easy_init();
+    if (!curl) return "";
+
+    std::string readBuffer;
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0");
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK || readBuffer.empty()) return "";
+
+    // Use HTML Tidy to clean HTML
+    TidyDoc tdoc = tidyCreate();
+    TidyBuffer output = {0};
+    TidyBuffer errbuf = {0};
+
+    tidyOptSetBool(tdoc, TidyXhtmlOut, yes);
+    tidyOptSetBool(tdoc, TidyQuiet, yes);
+    tidyOptSetBool(tdoc, TidyShowWarnings, no);
+    tidyOptSetBool(tdoc, TidyForceOutput, yes);
+    tidyOptSetInt(tdoc, TidyWrapLen, 0);
+
+    tidySetErrorBuffer(tdoc, &errbuf);
+    tidyParseString(tdoc, readBuffer.c_str());
+    tidyCleanAndRepair(tdoc);
+    tidySaveBuffer(tdoc, &output);
+
+    std::string cleanedHtml;
+    if (output.bp) {
+        cleanedHtml = std::string((char*)output.bp, output.size);
+    }
+
+    tidyBufFree(&output);
+    tidyBufFree(&errbuf);
+    tidyRelease(tdoc);
+
+    if (cleanedHtml.empty()) return "";
+
+    // Parse with pugixml
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_string(cleanedHtml.c_str());
+    if (!result) return "";
+
+    // Find lyrics div with id="songLyricsDiv"
+    pugi::xml_node lyrics_div = doc.select_node("//p[@id='songLyricsDiv']").node();
+    if (!lyrics_div) return "";
+
+    // Extract text content
+    std::string lyrics;
+    std::function<void(pugi::xml_node)> extractText = [&](pugi::xml_node node) {
+        for (pugi::xml_node child : node.children()) {
+            if (child.type() == pugi::node_pcdata) {
+                lyrics += child.value();
+            } else if (std::string(child.name()) == "br") {
+                lyrics += "\n";
+            } else {
+                extractText(child);
+            }
+        }
+    };
+    extractText(lyrics_div);
+
+    // Trim whitespace
+    size_t start = lyrics.find_first_not_of(" \t\n\r");
+    size_t end = lyrics.find_last_not_of(" \t\n\r");
+    if (start != std::string::npos && end != std::string::npos) {
+        lyrics = lyrics.substr(start, end - start + 1);
+    }
+
+    return lyrics;
+}
+
+// Manual search - uses the selected track's metadata but allows searching with modified terms
+// For now, just perform an auto-search with the track metadata
+// TODO: Add proper input dialog when foobar2000 mac supports it
+static void RunManualSearch(metadb_handle_list_cref data) {
+    pfc::string_formatter message;
+
+    if (data.get_count() == 0) {
+        popup_message::g_show("No track selected.", "Manual Search");
+        return;
+    }
+
+    metadb_handle_ptr track = data.get_item(0);
+    const metadb_v2_rec_t track_info = get_full_metadata(track);
+
+    std::string artist = track_metadata(track_info, "artist");
+    std::string title = track_metadata(track_info, "title");
+
+    if (artist.empty() || title.empty()) {
+        popup_message::g_show("Track missing artist or title metadata.", "Manual Search");
+        return;
+    }
+
+    message << "Searching for: " << artist.c_str() << " - " << title.c_str() << "\n\n";
+
+    // Perform search using the _by_name functions
+    auto [lyrics, source_name] = manual_search_lyrics(artist, title, message);
+
+    if (lyrics.empty()) {
+        message << "No lyrics found from any source.\n";
+    } else {
+        message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
+        message << "--- Lyrics ---\n" << lyrics.c_str() << "\n";
+
+        // Save to cache folder
+        std::string filename = sanitize_filename(artist) + " - " + sanitize_filename(title) + ".lrc";
+        std::string lrc_path = LYRICS_CACHE_FOLDER + filename;
+
+        // Create cache folder if needed
+        std::string mkdir_cmd = "mkdir -p \"" + LYRICS_CACHE_FOLDER + "\"";
+        system(mkdir_cmd.c_str());
+
+        std::ofstream outfile(lrc_path, std::ios::out | std::ios::binary);
+        if (outfile.is_open()) {
+            outfile.write(lyrics.c_str(), lyrics.length());
+            outfile.close();
+            message << "\n[Saved to: " << lrc_path.c_str() << "]\n";
+        }
+    }
+
+    popup_message::g_show(message, "Manual Search");
 }
 
 
