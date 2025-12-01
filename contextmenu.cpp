@@ -1,5 +1,13 @@
 #include "stdafx.h"
 #include "../SDK/console_manager.h"
+#include "../SDK/cfg_var.h"
+
+// {A1B2C3D4-E5F6-7890-ABCD-EF1234567890} - GUID for auto-search toggle setting
+static const GUID guid_cfg_auto_search_on_playback =
+    { 0xa1b2c3d4, 0xe5f6, 0x7890, { 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x90 } };
+
+// Toggle: false = show cached lyrics only, true = auto-search and save
+static cfg_bool cfg_auto_search_on_playback(guid_cfg_auto_search_on_playback, false);
 #include <curl/curl.h>
 #include <pugixml.hpp>
 #include "cJSON.h"
@@ -1887,10 +1895,7 @@ static std::string get_cached_lyrics_from_file(metadb_handle_ptr track) {
 // Helper: Get best lyrics from all sources (returns lyrics string and source name)
 // Checks cached/local sources first before searching online
 static std::pair<std::string, std::string> auto_search_get_best_lyrics(const metadb_v2_rec_t& track_info, metadb_handle_ptr track, pfc::string_formatter& message) {
-    std::string artist = track_metadata(track_info, "artist");
-    std::string title = track_metadata(track_info, "title");
-
-    message << "Searching for: " << artist.c_str() << " - " << title.c_str() << "\n\n";
+    
 
     // Check cached sources first
     message << "=== Checking Local/Cached Sources ===\n";
@@ -2053,6 +2058,11 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup)
 
     metadb_handle_ptr track = data.get_item(0);
     const metadb_v2_rec_t track_info = get_full_metadata(track);
+    
+    std::string artist = track_metadata(track_info, "artist");
+    std::string title = track_metadata(track_info, "title");
+    console::clearBacklog();
+    FB2K_console_formatter() << "Searching for: " << artist.c_str() << " - " << title.c_str() << "\n\n";
 
     std::thread([track, track_info, show_popup]() {
         pfc::string_formatter message;
@@ -2199,18 +2209,62 @@ public:
         const metadb_v2_rec_t track_info = get_full_metadata(p_track);
         std::string artist = track_metadata(track_info, "artist");
         std::string title = track_metadata(track_info, "title");
+        console::clearBacklog();
 
-        // Check for lyrics in metadata tags first, then files
-        std::string lyrics = get_cached_lyrics_from_tag(track_info);
-        if (lyrics.empty()) {
-            lyrics = get_cached_lyrics_from_file(p_track);
-        }
+        if (cfg_auto_search_on_playback) {
+            // Auto-search mode: search online and save to file
+            metadb_handle_list tracks;
+            tracks.add_item(p_track);
+            RunAutoSearchSaveFile(tracks, false);
+        } else {
+            // Cached mode: check for lyrics in metadata tags first, then files
+            std::string lyrics = get_cached_lyrics_from_tag(track_info);
+            if (lyrics.empty()) {
+                lyrics = get_cached_lyrics_from_file(p_track);
+            }
 
-        if (!lyrics.empty()) {
-            console::clearBacklog();
-            FB2K_console_formatter() << "[Lyrics] " << artist.c_str() << " - " << title.c_str() << "\n\n" << lyrics.c_str();
+            if (!lyrics.empty()) {
+                FB2K_console_formatter() << "[Lyrics] " << artist.c_str() << " - " << title.c_str() << "\n\n" << lyrics.c_str();
+            }
         }
     }
 };
 
 FB2K_SERVICE_FACTORY(lyrics_playback_callback);
+
+// Menu toggle for auto-search on playback
+// {B2C3D4E5-F6A7-8901-BCDE-F12345678901}
+static const GUID guid_mainmenu_auto_search_toggle =
+    { 0xb2c3d4e5, 0xf6a7, 0x8901, { 0xbc, 0xde, 0xf1, 0x23, 0x45, 0x67, 0x89, 0x01 } };
+
+class mainmenu_commands_lyrics : public mainmenu_commands {
+public:
+    t_uint32 get_command_count() override { return 1; }
+
+    GUID get_command(t_uint32 p_index) override {
+        return guid_mainmenu_auto_search_toggle;
+    }
+
+    void get_name(t_uint32 p_index, pfc::string_base& p_out) override {
+        p_out = "Auto-search lyrics on playback";
+    }
+
+    bool get_description(t_uint32 p_index, pfc::string_base& p_out) override {
+        p_out = "When enabled, automatically searches and saves lyrics when a new track starts playing";
+        return true;
+    }
+
+    void execute(t_uint32 p_index, service_ptr_t<service_base>) override {
+        cfg_auto_search_on_playback = !cfg_auto_search_on_playback;
+    }
+
+    bool get_display(t_uint32 p_index, pfc::string_base& p_out, t_uint32& p_flags) override {
+        get_name(p_index, p_out);
+        p_flags = cfg_auto_search_on_playback ? flag_checked : 0;
+        return true;
+    }
+
+    GUID get_parent() override { return mainmenu_groups::playback; }
+};
+
+static mainmenu_commands_factory_t<mainmenu_commands_lyrics> g_mainmenu_lyrics;
