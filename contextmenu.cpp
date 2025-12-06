@@ -136,6 +136,104 @@ static std::string decode_html_entities(const std::string& input) {
     return result;
 }
 
+// Normalize string for comparison: lowercase ASCII, remove ASCII punctuation, collapse whitespace
+// Preserves non-ASCII characters (Japanese, Chinese, Korean, etc.)
+static std::string normalize_for_comparison(const std::string& input) {
+    std::string result;
+    result.reserve(input.size());
+    bool last_was_space = true; // Start true to trim leading spaces
+
+    for (unsigned char c : input) {
+        // Preserve UTF-8 multi-byte characters (Japanese, Chinese, Korean, etc.)
+        // UTF-8 bytes >= 0x80 are part of multi-byte sequences
+        if (c >= 0x80) {
+            result += c;
+            last_was_space = false;
+            continue;
+        }
+
+        // Convert ASCII uppercase to lowercase
+        if (c >= 'A' && c <= 'Z') {
+            c = c + ('a' - 'A');
+        }
+
+        // Keep ASCII alphanumeric chars
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+            result += c;
+            last_was_space = false;
+        } else if (c == ' ' || c == '\t' || c == '-' || c == '_') {
+            // Collapse whitespace and common separators
+            if (!last_was_space) {
+                result += ' ';
+                last_was_space = true;
+            }
+        }
+        // Skip ASCII punctuation
+    }
+
+    // Trim trailing space
+    if (!result.empty() && result.back() == ' ') {
+        result.pop_back();
+    }
+
+    return result;
+}
+
+// Check if two strings are similar enough (for song title matching)
+// Returns true if strings are similar, accounting for minor differences
+static bool titles_are_similar(const std::string& expected, const std::string& actual, double threshold = 0.7) {
+    std::string norm_expected = normalize_for_comparison(expected);
+    std::string norm_actual = normalize_for_comparison(actual);
+
+    // Empty check
+    if (norm_expected.empty() || norm_actual.empty()) {
+        return false;
+    }
+
+    // Exact match after normalization
+    if (norm_expected == norm_actual) {
+        return true;
+    }
+
+    // Check if one contains the other (common for "(feat. X)" or "Remastered" variants)
+    if (norm_expected.find(norm_actual) != std::string::npos ||
+        norm_actual.find(norm_expected) != std::string::npos) {
+        return true;
+    }
+
+    // Calculate Levenshtein distance for fuzzy matching
+    size_t len1 = norm_expected.length();
+    size_t len2 = norm_actual.length();
+
+    // If lengths differ too much, likely different songs
+    if (len1 > 2 * len2 || len2 > 2 * len1) {
+        return false;
+    }
+
+    // Levenshtein distance calculation
+    std::vector<std::vector<size_t>> dp(len1 + 1, std::vector<size_t>(len2 + 1));
+
+    for (size_t i = 0; i <= len1; ++i) dp[i][0] = i;
+    for (size_t j = 0; j <= len2; ++j) dp[0][j] = j;
+
+    for (size_t i = 1; i <= len1; ++i) {
+        for (size_t j = 1; j <= len2; ++j) {
+            size_t cost = (norm_expected[i-1] == norm_actual[j-1]) ? 0 : 1;
+            dp[i][j] = std::min({
+                dp[i-1][j] + 1,      // deletion
+                dp[i][j-1] + 1,      // insertion
+                dp[i-1][j-1] + cost  // substitution
+            });
+        }
+    }
+
+    size_t distance = dp[len1][len2];
+    size_t max_len = std::max(len1, len2);
+    double similarity = 1.0 - (double)distance / (double)max_len;
+
+    return similarity >= threshold;
+}
+
 // Identifier of our context menu group. Substitute with your own when reusing code.
 static const GUID guid_mygroup = { 0x572de7f4, 0xcbdf, 0x479a, { 0x97, 0x26, 0xa, 0xb0, 0x97, 0x47, 0x69, 0xe3 } };
 
@@ -162,6 +260,8 @@ static void RunFromFile(metadb_handle_list_cref data);
 static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup = true);
 
 static void RunAutoSearchSaveTag(metadb_handle_list_cref data);
+
+static void RunClearCachedLyrics(metadb_handle_list_cref data);
 
 metadb_v2_rec_t get_full_metadata(metadb_handle_ptr track);
 
@@ -223,6 +323,7 @@ class myitem : public contextmenu_item_simple {
         songlyrics,
 //        fromfile,
 //        autosearch_save_tag,
+        clear_cached_lyrics,
         cmd_total
     };
     GUID get_parent() {return guid_mygroup;}
@@ -239,6 +340,7 @@ class myitem : public contextmenu_item_simple {
             case autosearch_save_file: p_out = "Search & Save"; break;
             case autosearch_save_file_silent: p_out = "Search & Save (Silent)"; break;
 //            case autosearch_save_tag: p_out = "Auto Search & Save to Tag"; break;
+            case clear_cached_lyrics: p_out = "Clear Cached Lyrics"; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
     }
@@ -274,6 +376,9 @@ class myitem : public contextmenu_item_simple {
 //            case autosearch_save_tag:
 //                RunAutoSearchSaveTag(p_data);
 //                break;
+            case clear_cached_lyrics:
+                RunClearCachedLyrics(p_data);
+                break;
             default:
                 uBugCheck();
         }
@@ -291,10 +396,12 @@ class myitem : public contextmenu_item_simple {
 //        static const GUID guid_autosearch_save_tag = { 0xc2a9ff85, 0x1bc8, 0x4d01, { 0x2b, 0x6a, 0x06, 0xa6, 0x52, 0x0f, 0x9b, 0xf3 } };
 
         static const GUID guid_autosearch_save_file_silent = { 0xd3baffa6, 0x2cd9, 0x4e12, { 0x3c, 0x7b, 0x17, 0xb7, 0x63, 0x10, 0xac, 0x04 } };
+        static const GUID guid_clear_cached_lyrics = { 0xe4cbffb7, 0x3dea, 0x5f23, { 0x4d, 0x8c, 0x28, 0xc8, 0x74, 0x21, 0xbd, 0x15 } };
 
         switch(p_index) {
             case autosearch_save_file: return guid_autosearch_save_file;
             case autosearch_save_file_silent: return guid_autosearch_save_file_silent;
+            case clear_cached_lyrics: return guid_clear_cached_lyrics;
 //            case wack: return guid_wack;
             case qqmusic: return guid_qqmusic;
             case netease: return guid_netease;
@@ -339,6 +446,9 @@ class myitem : public contextmenu_item_simple {
 //            case autosearch_save_tag:
 //                p_out = "Search all sources and save to LYRICS tag";
 //                return true;
+            case clear_cached_lyrics:
+                p_out = "Delete cached .lrc/.txt lyrics files for selected tracks";
+                return true;
             default:
                 uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
@@ -1512,11 +1622,20 @@ static std::string qqmusic_search_lyrics_only(const metadb_v2_rec_t& track_info)
         cJSON* song_obj = cJSON_GetObjectItem(data_obj, "song");
         if (song_obj) {
             cJSON* song_arr = cJSON_GetObjectItem(song_obj, "itemlist");
-            if (song_arr && cJSON_GetArraySize(song_arr) > 0) {
-                cJSON* song_item = cJSON_GetArrayItem(song_arr, 0);
+            int arr_size = song_arr ? cJSON_GetArraySize(song_arr) : 0;
+            // Iterate through results to find one with similar title
+            for (int i = 0; i < arr_size; ++i) {
+                cJSON* song_item = cJSON_GetArrayItem(song_arr, i);
+                cJSON* name_item = cJSON_GetObjectItem(song_item, "name");
                 cJSON* mid_item = cJSON_GetObjectItem(song_item, "mid");
-                if (mid_item && mid_item->type == cJSON_String) {
-                    song_mid = mid_item->valuestring;
+
+                if (name_item && name_item->type == cJSON_String &&
+                    mid_item && mid_item->type == cJSON_String) {
+                    std::string result_title = name_item->valuestring;
+                    if (titles_are_similar(title, result_title)) {
+                        song_mid = mid_item->valuestring;
+                        break;
+                    }
                 }
             }
         }
@@ -1570,11 +1689,20 @@ static std::string netease_search_lyrics_only(const metadb_v2_rec_t& track_info)
     cJSON* result_obj = cJSON_GetObjectItem(json, "result");
     if (result_obj) {
         cJSON* song_arr = cJSON_GetObjectItem(result_obj, "songs");
-        if (song_arr && cJSON_GetArraySize(song_arr) > 0) {
-            cJSON* song_item = cJSON_GetArrayItem(song_arr, 0);
+        int arr_size = song_arr ? cJSON_GetArraySize(song_arr) : 0;
+        // Iterate through results to find one with similar title
+        for (int i = 0; i < arr_size; ++i) {
+            cJSON* song_item = cJSON_GetArrayItem(song_arr, i);
+            cJSON* name_item = cJSON_GetObjectItem(song_item, "name");
             cJSON* id_item = cJSON_GetObjectItem(song_item, "id");
-            if (id_item && id_item->type == cJSON_Number) {
-                song_id = std::to_string((int64_t)id_item->valuedouble);
+
+            if (name_item && name_item->type == cJSON_String &&
+                id_item && id_item->type == cJSON_Number) {
+                std::string result_title = name_item->valuestring;
+                if (titles_are_similar(title, result_title)) {
+                    song_id = std::to_string((int64_t)id_item->valuedouble);
+                    break;
+                }
             }
         }
     }
@@ -1636,18 +1764,28 @@ static std::string musixmatch_search_lyrics_only(const metadb_v2_rec_t& track_in
     cJSON* json_body = cJSON_GetObjectItem(json_message, "body");
     cJSON* json_tracklist = cJSON_GetObjectItem(json_body, "track_list");
 
-    if (cJSON_IsArray(json_tracklist) && cJSON_GetArraySize(json_tracklist) > 0) {
-        cJSON* json_track = cJSON_GetArrayItem(json_tracklist, 0);
-        cJSON* json_tracktrack = cJSON_GetObjectItem(json_track, "track");
-        cJSON* json_trackid = cJSON_GetObjectItem(json_tracktrack, "commontrack_id");
-        cJSON* json_hassubtitles = cJSON_GetObjectItem(json_tracktrack, "has_subtitles");
-        cJSON* json_haslyrics = cJSON_GetObjectItem(json_tracktrack, "has_lyrics");
+    if (cJSON_IsArray(json_tracklist)) {
+        int arr_size = cJSON_GetArraySize(json_tracklist);
+        // Iterate through results to find one with similar title
+        for (int i = 0; i < arr_size; ++i) {
+            cJSON* json_track = cJSON_GetArrayItem(json_tracklist, i);
+            cJSON* json_tracktrack = cJSON_GetObjectItem(json_track, "track");
+            cJSON* json_trackname = cJSON_GetObjectItem(json_tracktrack, "track_name");
+            cJSON* json_trackid = cJSON_GetObjectItem(json_tracktrack, "commontrack_id");
+            cJSON* json_hassubtitles = cJSON_GetObjectItem(json_tracktrack, "has_subtitles");
+            cJSON* json_haslyrics = cJSON_GetObjectItem(json_tracktrack, "has_lyrics");
 
-        if (json_trackid && json_trackid->type == cJSON_Number) {
-            track_id = std::to_string(json_trackid->valueint);
+            if (json_trackname && json_trackname->type == cJSON_String &&
+                json_trackid && json_trackid->type == cJSON_Number) {
+                std::string result_title = json_trackname->valuestring;
+                if (titles_are_similar(title, result_title)) {
+                    track_id = std::to_string(json_trackid->valueint);
+                    has_subtitles = json_hassubtitles && json_hassubtitles->valueint != 0;
+                    has_lyrics = json_haslyrics && json_haslyrics->valueint != 0;
+                    break;
+                }
+            }
         }
-        has_subtitles = json_hassubtitles && json_hassubtitles->valueint != 0;
-        has_lyrics = json_haslyrics && json_haslyrics->valueint != 0;
     }
     cJSON_Delete(json);
 
@@ -1690,6 +1828,31 @@ static std::string songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_in
 
     pugi::xml_document doc;
     load_html_document(readBuffer.c_str(), doc);
+
+    // Verify the page title contains our expected song title
+    // SongLyrics.com page titles are like "ARTIST - TITLE LYRICS"
+    pugi::xpath_query query_title("//title");
+    pugi::xpath_node_set titles = query_title.evaluate_node_set(doc);
+    if (!titles.empty()) {
+        std::string page_title = titles.first().node().text().get();
+        // Extract just the song title part (before " LYRICS" or " Lyrics")
+        size_t lyrics_pos = page_title.find(" LYRICS");
+        if (lyrics_pos == std::string::npos) {
+            lyrics_pos = page_title.find(" Lyrics");
+        }
+        if (lyrics_pos != std::string::npos) {
+            page_title = page_title.substr(0, lyrics_pos);
+        }
+        // Remove artist prefix if present (format: "ARTIST - TITLE")
+        size_t dash_pos = page_title.find(" - ");
+        if (dash_pos != std::string::npos) {
+            page_title = page_title.substr(dash_pos + 3);
+        }
+        // Verify the title matches
+        if (!titles_are_similar(title, page_title)) {
+            return "";
+        }
+    }
 
     pugi::xpath_query query_lyricdiv("//p[@id='songLyricsDiv']");
     pugi::xpath_node_set lyricdivs = query_lyricdiv.evaluate_node_set(doc);
@@ -2135,6 +2298,62 @@ static void RunAutoSearchSaveTag(metadb_handle_list_cref data) {
             popup_message::g_show(result_msg.c_str(), "Auto Search & Save to Tag");
         });
     }).detach();
+}
+
+
+// Clear cached lyrics files for selected tracks
+static void RunClearCachedLyrics(metadb_handle_list_cref data) {
+    if (data.get_count() == 0) {
+        popup_message::g_show("No tracks selected", "Clear Cached Lyrics");
+        return;
+    }
+
+    pfc::string_formatter message;
+    int deleted_count = 0;
+    int not_found_count = 0;
+
+    for (size_t i = 0; i < data.get_count(); ++i) {
+        metadb_handle_ptr track = data.get_item(i);
+        const metadb_v2_rec_t track_info = get_full_metadata(track);
+
+        std::string artist = track_metadata(track_info, "artist");
+        std::string title = track_metadata(track_info, "title");
+
+        if (artist.empty() || title.empty()) {
+            continue;
+        }
+
+        bool found_any = false;
+        std::vector<std::string> extensions = {".lrc", ".txt"};
+        for (const auto& ext : extensions) {
+            std::string lyrics_path = get_lyrics_cache_path(track_info, ext);
+            if (lyrics_path.empty()) {
+                continue;
+            }
+
+            if (std::remove(lyrics_path.c_str()) == 0) {
+                message << "Deleted: " << artist.c_str() << " - " << title.c_str() << ext.c_str() << "\n";
+                deleted_count++;
+                found_any = true;
+            }
+        }
+
+        if (!found_any) {
+            not_found_count++;
+        }
+    }
+
+    if (deleted_count == 0) {
+        message << "No cached lyrics files found for the selected track(s).\n";
+    } else {
+        message << "\nDeleted " << deleted_count << " file(s).\n";
+    }
+
+    if (not_found_count > 0 && deleted_count > 0) {
+        message << not_found_count << " track(s) had no cached lyrics.\n";
+    }
+
+    popup_message::g_show(message.get_ptr(), "Clear Cached Lyrics");
 }
 
 
