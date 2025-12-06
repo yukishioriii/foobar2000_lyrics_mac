@@ -29,6 +29,7 @@ static cfg_bool cfg_auto_search_on_playback(guid_cfg_auto_search_on_playback, fa
 #include <cctype>
 #include <algorithm>
 #include <utility>
+#include <tuple>
 #include <unordered_map>
 #include <thread>
 
@@ -265,7 +266,7 @@ static void RunClearCachedLyrics(metadb_handle_list_cref data);
 
 metadb_v2_rec_t get_full_metadata(metadb_handle_ptr track);
 
-static std::pair<std::string, std::string> auto_search_get_best_lyrics(
+static std::tuple<std::string, std::string, std::string> auto_search_get_best_lyrics(
     const metadb_v2_rec_t& track_info,
     metadb_handle_ptr track,
     pfc::string_formatter& message);
@@ -315,6 +316,7 @@ class myitem : public contextmenu_item_simple {
     enum {
 //        wack = 0,
         autosearch_save_file_silent,
+        clear_and_search,
         autosearch_save_file,
 //        autosearch = 0,
         qqmusic,
@@ -341,6 +343,7 @@ class myitem : public contextmenu_item_simple {
             case autosearch_save_file_silent: p_out = "Search & Save (Silent)"; break;
 //            case autosearch_save_tag: p_out = "Auto Search & Save to Tag"; break;
             case clear_cached_lyrics: p_out = "Clear Cached Lyrics"; break;
+            case clear_and_search: p_out = "Re-fetch Lyrics"; break;
             default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
         }
     }
@@ -379,6 +382,10 @@ class myitem : public contextmenu_item_simple {
             case clear_cached_lyrics:
                 RunClearCachedLyrics(p_data);
                 break;
+            case clear_and_search:
+                RunClearCachedLyrics(p_data);
+                RunAutoSearchSaveFile(p_data, false);
+                break;
             default:
                 uBugCheck();
         }
@@ -397,11 +404,13 @@ class myitem : public contextmenu_item_simple {
 
         static const GUID guid_autosearch_save_file_silent = { 0xd3baffa6, 0x2cd9, 0x4e12, { 0x3c, 0x7b, 0x17, 0xb7, 0x63, 0x10, 0xac, 0x04 } };
         static const GUID guid_clear_cached_lyrics = { 0xe4cbffb7, 0x3dea, 0x5f23, { 0x4d, 0x8c, 0x28, 0xc8, 0x74, 0x21, 0xbd, 0x15 } };
+        static const GUID guid_clear_and_search = { 0xf5dcffc8, 0x4efb, 0x6034, { 0x5e, 0x9d, 0x39, 0xd9, 0x85, 0x32, 0xce, 0x26 } };
 
         switch(p_index) {
             case autosearch_save_file: return guid_autosearch_save_file;
             case autosearch_save_file_silent: return guid_autosearch_save_file_silent;
             case clear_cached_lyrics: return guid_clear_cached_lyrics;
+            case clear_and_search: return guid_clear_and_search;
 //            case wack: return guid_wack;
             case qqmusic: return guid_qqmusic;
             case netease: return guid_netease;
@@ -448,6 +457,9 @@ class myitem : public contextmenu_item_simple {
 //                return true;
             case clear_cached_lyrics:
                 p_out = "Delete cached .lrc/.txt lyrics files for selected tracks";
+                return true;
+            case clear_and_search:
+                p_out = "Clear cached lyrics and search again";
                 return true;
             default:
                 uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
@@ -1584,13 +1596,15 @@ static void RunSongLyrics(metadb_handle_list_cref data) {
 struct LyricsResult {
     std::string source_name;
     std::string lyrics;
+    std::string matched_title;
     size_t length;
 };
 
 // Helper function to extract just the lyrics portion from QQ Music
-static std::string qqmusic_search_lyrics_only(const metadb_v2_rec_t& track_info) {
+// Returns pair of (lyrics, matched_title)
+static std::pair<std::string, std::string> qqmusic_search_lyrics_only(const metadb_v2_rec_t& track_info) {
     CURL *curl = curl_easy_init();
-    if (!curl) return "";
+    if (!curl) return {"", ""};
 
     std::string readBuffer;
     std::string artist = track_metadata(track_info, "artist");
@@ -1611,12 +1625,13 @@ static std::string qqmusic_search_lyrics_only(const metadb_v2_rec_t& track_info)
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) return "";
+    if (res != CURLE_OK) return {"", ""};
 
     cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
-    if (!json) return "";
+    if (!json) return {"", ""};
 
     std::string song_mid;
+    std::string matched_title;
     cJSON* data_obj = cJSON_GetObjectItem(json, "data");
     if (data_obj) {
         cJSON* song_obj = cJSON_GetObjectItem(data_obj, "song");
@@ -1634,6 +1649,7 @@ static std::string qqmusic_search_lyrics_only(const metadb_v2_rec_t& track_info)
                     std::string result_title = name_item->valuestring;
                     if (titles_are_similar(title, result_title)) {
                         song_mid = mid_item->valuestring;
+                        matched_title = result_title;
                         break;
                     }
                 }
@@ -1642,17 +1658,18 @@ static std::string qqmusic_search_lyrics_only(const metadb_v2_rec_t& track_info)
     }
     cJSON_Delete(json);
 
-    if (song_mid.empty()) return "";
+    if (song_mid.empty()) return {"", ""};
 
     // Lookup lyrics
     pfc::string_formatter dummy;
-    return qqmusic_lookup(song_mid, dummy);
+    return {qqmusic_lookup(song_mid, dummy), matched_title};
 }
 
 // Helper function to extract just the lyrics portion from NetEase
-static std::string netease_search_lyrics_only(const metadb_v2_rec_t& track_info) {
+// Returns pair of (lyrics, matched_title)
+static std::pair<std::string, std::string> netease_search_lyrics_only(const metadb_v2_rec_t& track_info) {
     CURL *curl = curl_easy_init();
-    if (!curl) return "";
+    if (!curl) return {"", ""};
 
     std::string readBuffer;
     std::string artist = track_metadata(track_info, "artist");
@@ -1680,12 +1697,13 @@ static std::string netease_search_lyrics_only(const metadb_v2_rec_t& track_info)
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) return "";
+    if (res != CURLE_OK) return {"", ""};
 
     cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
-    if (!json) return "";
+    if (!json) return {"", ""};
 
     std::string song_id;
+    std::string matched_title;
     cJSON* result_obj = cJSON_GetObjectItem(json, "result");
     if (result_obj) {
         cJSON* song_arr = cJSON_GetObjectItem(result_obj, "songs");
@@ -1701,6 +1719,7 @@ static std::string netease_search_lyrics_only(const metadb_v2_rec_t& track_info)
                 std::string result_title = name_item->valuestring;
                 if (titles_are_similar(title, result_title)) {
                     song_id = std::to_string((int64_t)id_item->valuedouble);
+                    matched_title = result_title;
                     break;
                 }
             }
@@ -1708,24 +1727,25 @@ static std::string netease_search_lyrics_only(const metadb_v2_rec_t& track_info)
     }
     cJSON_Delete(json);
 
-    if (song_id.empty()) return "";
+    if (song_id.empty()) return {"", ""};
 
     // Lookup lyrics
     pfc::string_formatter dummy;
-    return netease_lookup(song_id, dummy);
+    return {netease_lookup(song_id, dummy), matched_title};
 }
 
 // Helper function to extract just the lyrics portion from Musixmatch
-static std::string musixmatch_search_lyrics_only(const metadb_v2_rec_t& track_info) {
+// Returns pair of (lyrics, matched_title)
+static std::pair<std::string, std::string> musixmatch_search_lyrics_only(const metadb_v2_rec_t& track_info) {
     // Get or refresh token
     if (g_musixmatch_token.empty()) {
         pfc::string_formatter dummy;
         g_musixmatch_token = musixmatch_get_token(dummy);
-        if (g_musixmatch_token.empty()) return "";
+        if (g_musixmatch_token.empty()) return {"", ""};
     }
 
     CURL *curl = curl_easy_init();
-    if (!curl) return "";
+    if (!curl) return {"", ""};
 
     std::string readBuffer;
     std::string artist = track_metadata(track_info, "artist");
@@ -1751,12 +1771,13 @@ static std::string musixmatch_search_lyrics_only(const metadb_v2_rec_t& track_in
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) return "";
+    if (res != CURLE_OK) return {"", ""};
 
     cJSON* json = cJSON_ParseWithLength(readBuffer.c_str(), readBuffer.length());
-    if (!json) return "";
+    if (!json) return {"", ""};
 
     std::string track_id;
+    std::string matched_title;
     bool has_subtitles = false;
     bool has_lyrics = false;
 
@@ -1780,6 +1801,7 @@ static std::string musixmatch_search_lyrics_only(const metadb_v2_rec_t& track_in
                 std::string result_title = json_trackname->valuestring;
                 if (titles_are_similar(title, result_title)) {
                     track_id = std::to_string(json_trackid->valueint);
+                    matched_title = result_title;
                     has_subtitles = json_hassubtitles && json_hassubtitles->valueint != 0;
                     has_lyrics = json_haslyrics && json_haslyrics->valueint != 0;
                     break;
@@ -1789,7 +1811,7 @@ static std::string musixmatch_search_lyrics_only(const metadb_v2_rec_t& track_in
     }
     cJSON_Delete(json);
 
-    if (track_id.empty()) return "";
+    if (track_id.empty()) return {"", ""};
 
     pfc::string_formatter dummy;
     std::string lyrics;
@@ -1799,13 +1821,14 @@ static std::string musixmatch_search_lyrics_only(const metadb_v2_rec_t& track_in
     if (lyrics.empty() && has_lyrics) {
         lyrics = musixmatch_lookup_unsynced(track_id, g_musixmatch_token, dummy);
     }
-    return lyrics;
+    return {lyrics, matched_title};
 }
 
 // Helper function to extract just the lyrics portion from SongLyrics.com
-static std::string songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_info) {
+// Returns pair of (lyrics, matched_title)
+static std::pair<std::string, std::string> songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_info) {
     CURL *curl = curl_easy_init();
-    if (!curl) return "";
+    if (!curl) return {"", ""};
 
     std::string readBuffer;
     std::string artist = track_metadata(track_info, "artist");
@@ -1824,13 +1847,14 @@ static std::string songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_in
 
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) return "";
+    if (res != CURLE_OK) return {"", ""};
 
     pugi::xml_document doc;
     load_html_document(readBuffer.c_str(), doc);
 
     // Verify the page title contains our expected song title
     // SongLyrics.com page titles are like "ARTIST - TITLE LYRICS"
+    std::string matched_title;
     pugi::xpath_query query_title("//title");
     pugi::xpath_node_set titles = query_title.evaluate_node_set(doc);
     if (!titles.empty()) {
@@ -1850,14 +1874,15 @@ static std::string songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_in
         }
         // Verify the title matches
         if (!titles_are_similar(title, page_title)) {
-            return "";
+            return {"", ""};
         }
+        matched_title = page_title;
     }
 
     pugi::xpath_query query_lyricdiv("//p[@id='songLyricsDiv']");
     pugi::xpath_node_set lyricdivs = query_lyricdiv.evaluate_node_set(doc);
 
-    if (lyricdivs.empty()) return "";
+    if (lyricdivs.empty()) return {"", ""};
 
     std::string lyrics;
     pugi::xml_node lyrics_node = lyricdivs.first().node();
@@ -1880,7 +1905,7 @@ static std::string songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_in
     extract_text(lyrics_node);
 
     if (lyrics.find("We do not have the lyrics for") != std::string::npos) {
-        return "";
+        return {"", ""};
     }
 
     size_t start = lyrics.find_first_not_of(" \t\n\r");
@@ -1889,7 +1914,7 @@ static std::string songlyrics_search_lyrics_only(const metadb_v2_rec_t& track_in
         lyrics = lyrics.substr(start, end - start + 1);
     }
 
-    return lyrics;
+    return {lyrics, matched_title};
 }
 
 // Auto search - iterate through all sources and return best match (runs in background thread)
@@ -1905,13 +1930,16 @@ static void RunAutoSearch(metadb_handle_list_cref data) {
     // Run search in background thread
     std::thread([track, track_info]() {
         pfc::string_formatter message;
-        auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
+        auto [lyrics, source_name, matched_title] = auto_search_get_best_lyrics(track_info, track, message);
 
         if (lyrics.empty()) {
             message << "No lyrics found from any source.\n";
         } else {
-            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
-            message << "--- Lyrics ---\n" << lyrics.c_str() << "\n";
+            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n";
+            if (!matched_title.empty()) {
+                message << "Matched title: " << matched_title.c_str() << "\n";
+            }
+            message << "\n--- Lyrics ---\n" << lyrics.c_str() << "\n";
         }
 
         std::string result_msg(message.get_ptr());
@@ -2055,10 +2083,10 @@ static std::string get_cached_lyrics_from_file(metadb_handle_ptr track) {
     return "";
 }
 
-// Helper: Get best lyrics from all sources (returns lyrics string and source name)
+// Helper: Get best lyrics from all sources (returns lyrics, source name, and matched title)
 // Checks cached/local sources first before searching online
-static std::pair<std::string, std::string> auto_search_get_best_lyrics(const metadb_v2_rec_t& track_info, metadb_handle_ptr track, pfc::string_formatter& message) {
-    
+static std::tuple<std::string, std::string, std::string> auto_search_get_best_lyrics(const metadb_v2_rec_t& track_info, metadb_handle_ptr track, pfc::string_formatter& message) {
+
 
     // Check cached sources first
     message << "=== Checking Local/Cached Sources ===\n";
@@ -2069,7 +2097,7 @@ static std::pair<std::string, std::string> auto_search_get_best_lyrics(const met
     if (!tag_lyrics.empty()) {
         message << "FOUND (" << tag_lyrics.length() << " chars)\n";
         message << "[Using cached lyrics from metadata tag]\n";
-        return {decode_html_entities(tag_lyrics), "Metadata Tag (cached)"};
+        return {decode_html_entities(tag_lyrics), "Metadata Tag (cached)", ""};
     }
     message << "not found\n";
 
@@ -2079,7 +2107,7 @@ static std::pair<std::string, std::string> auto_search_get_best_lyrics(const met
     if (!file_lyrics.empty()) {
         message << "FOUND (" << file_lyrics.length() << " chars)\n";
         message << "[Using cached lyrics from file]\n";
-        return {decode_html_entities(file_lyrics), "Local File (cached)"};
+        return {decode_html_entities(file_lyrics), "Local File (cached)", ""};
     }
     message << "not found\n";
 
@@ -2089,36 +2117,36 @@ static std::pair<std::string, std::string> auto_search_get_best_lyrics(const met
 
     // Try each online source
     message << "Searching QQ Music... ";
-    std::string qq_lyrics = qqmusic_search_lyrics_only(track_info);
+    auto [qq_lyrics, qq_title] = qqmusic_search_lyrics_only(track_info);
     if (!qq_lyrics.empty()) {
-        results.push_back({"QQ Music", qq_lyrics, qq_lyrics.length()});
+        results.push_back({"QQ Music", qq_lyrics, qq_title, qq_lyrics.length()});
         message << "found (" << qq_lyrics.length() << " chars)\n";
     } else {
         message << "not found\n";
     }
 
     message << "Searching NetEase... ";
-    std::string netease_lyrics = netease_search_lyrics_only(track_info);
+    auto [netease_lyrics, netease_title] = netease_search_lyrics_only(track_info);
     if (!netease_lyrics.empty()) {
-        results.push_back({"NetEase", netease_lyrics, netease_lyrics.length()});
+        results.push_back({"NetEase", netease_lyrics, netease_title, netease_lyrics.length()});
         message << "found (" << netease_lyrics.length() << " chars)\n";
     } else {
         message << "not found\n";
     }
 
     message << "Searching Musixmatch... ";
-    std::string musixmatch_lyrics = musixmatch_search_lyrics_only(track_info);
+    auto [musixmatch_lyrics, musixmatch_title] = musixmatch_search_lyrics_only(track_info);
     if (!musixmatch_lyrics.empty()) {
-        results.push_back({"Musixmatch", musixmatch_lyrics, musixmatch_lyrics.length()});
+        results.push_back({"Musixmatch", musixmatch_lyrics, musixmatch_title, musixmatch_lyrics.length()});
         message << "found (" << musixmatch_lyrics.length() << " chars)\n";
     } else {
         message << "not found\n";
     }
 
     message << "Searching SongLyrics.com... ";
-    std::string songlyrics_lyrics = songlyrics_search_lyrics_only(track_info);
+    auto [songlyrics_lyrics, songlyrics_title] = songlyrics_search_lyrics_only(track_info);
     if (!songlyrics_lyrics.empty()) {
-        results.push_back({"SongLyrics.com", songlyrics_lyrics, songlyrics_lyrics.length()});
+        results.push_back({"SongLyrics.com", songlyrics_lyrics, songlyrics_title, songlyrics_lyrics.length()});
         message << "found (" << songlyrics_lyrics.length() << " chars)\n";
     } else {
         message << "not found\n";
@@ -2127,7 +2155,7 @@ static std::pair<std::string, std::string> auto_search_get_best_lyrics(const met
     message << "\n";
 
     if (results.empty()) {
-        return {"", ""};
+        return {"", "", ""};
     }
 
     // Find the result with the longest lyrics
@@ -2136,7 +2164,7 @@ static std::pair<std::string, std::string> auto_search_get_best_lyrics(const met
             return a.length < b.length;
         });
 
-    return {decode_html_entities(best->lyrics), best->source_name};
+    return {decode_html_entities(best->lyrics), best->source_name, best->matched_title};
 }
 
 
@@ -2229,12 +2257,16 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup)
 
     std::thread([track, track_info, show_popup]() {
         pfc::string_formatter message;
-        auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
+        auto [lyrics, source_name, matched_title] = auto_search_get_best_lyrics(track_info, track, message);
 
         if (lyrics.empty()) {
             message << "No lyrics found from any source.\n";
         } else {
-            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
+            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n";
+            if (!matched_title.empty()) {
+                message << "Matched title: " << matched_title.c_str() << "\n";
+            }
+            message << "\n";
 
             // Don't overwrite if lyrics came from cache (file or tag)
             bool is_cached = source_name.find("(cached)") != std::string::npos;
@@ -2272,12 +2304,16 @@ static void RunAutoSearchSaveTag(metadb_handle_list_cref data) {
 
     std::thread([track, track_info]() {
         pfc::string_formatter message;
-        auto [lyrics, source_name] = auto_search_get_best_lyrics(track_info, track, message);
+        auto [lyrics, source_name, matched_title] = auto_search_get_best_lyrics(track_info, track, message);
 
         if (lyrics.empty()) {
             message << "No lyrics found from any source.\n";
         } else {
-            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n\n";
+            message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n";
+            if (!matched_title.empty()) {
+                message << "Matched title: " << matched_title.c_str() << "\n";
+            }
+            message << "\n";
 
             // save_lyrics_to_tag needs to run on main thread for metadb access
             std::string lyrics_copy = lyrics;
@@ -2304,11 +2340,10 @@ static void RunAutoSearchSaveTag(metadb_handle_list_cref data) {
 // Clear cached lyrics files for selected tracks
 static void RunClearCachedLyrics(metadb_handle_list_cref data) {
     if (data.get_count() == 0) {
-        popup_message::g_show("No tracks selected", "Clear Cached Lyrics");
+        FB2K_console_formatter() << "[Lyrics] No tracks selected";
         return;
     }
 
-    pfc::string_formatter message;
     int deleted_count = 0;
     int not_found_count = 0;
 
@@ -2332,7 +2367,7 @@ static void RunClearCachedLyrics(metadb_handle_list_cref data) {
             }
 
             if (std::remove(lyrics_path.c_str()) == 0) {
-                message << "Deleted: " << artist.c_str() << " - " << title.c_str() << ext.c_str() << "\n";
+                FB2K_console_formatter() << "[Lyrics] Deleted: " << artist.c_str() << " - " << title.c_str() << ext.c_str();
                 deleted_count++;
                 found_any = true;
             }
@@ -2344,16 +2379,14 @@ static void RunClearCachedLyrics(metadb_handle_list_cref data) {
     }
 
     if (deleted_count == 0) {
-        message << "No cached lyrics files found for the selected track(s).\n";
+        FB2K_console_formatter() << "[Lyrics] No cached lyrics files found for the selected track(s)";
     } else {
-        message << "\nDeleted " << deleted_count << " file(s).\n";
+        FB2K_console_formatter() << "[Lyrics] Deleted " << deleted_count << " file(s)";
     }
 
     if (not_found_count > 0 && deleted_count > 0) {
-        message << not_found_count << " track(s) had no cached lyrics.\n";
+        FB2K_console_formatter() << "[Lyrics] " << not_found_count << " track(s) had no cached lyrics";
     }
-
-    popup_message::g_show(message.get_ptr(), "Clear Cached Lyrics");
 }
 
 
