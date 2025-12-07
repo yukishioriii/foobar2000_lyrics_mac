@@ -1,6 +1,7 @@
 # Foobar2000 lyrics components for Mac
 
 ![preview image](image.png)
+![preview image 2](image2.png)
 
 
 Most of the important code related to lyrics APIs are from https://github.com/jacquesh/foo_openlyrics
