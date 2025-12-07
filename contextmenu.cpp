@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "../SDK/console_manager.h"
 #include "../SDK/cfg_var.h"
+#include "Mac/lyrics_display.h"
 
 // {A1B2C3D4-E5F6-7890-ABCD-EF1234567890} - GUID for auto-search toggle setting
 static const GUID guid_cfg_auto_search_on_playback =
@@ -2255,12 +2256,14 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup)
     console::clearBacklog();
     FB2K_console_formatter() << "Searching for: " << artist.c_str() << " - " << title.c_str() << "\n\n";
 
-    std::thread([track, track_info, show_popup]() {
+    std::thread([track, track_info, show_popup, artist, title]() {
         pfc::string_formatter message;
         auto [lyrics, source_name, matched_title] = auto_search_get_best_lyrics(track_info, track, message);
 
         if (lyrics.empty()) {
             message << "No lyrics found from any source.\n";
+            // Clear the lyrics panel
+            lyrics_display::clear();
         } else {
             message << "Best match from: " << source_name.c_str() << " (" << lyrics.length() << " chars)\n";
             if (!matched_title.empty()) {
@@ -2276,6 +2279,9 @@ static void RunAutoSearchSaveFile(metadb_handle_list_cref data, bool show_popup)
                 message << "\n--- Lyrics Preview ---\n";
             }
             message << lyrics.c_str();
+
+            // Send lyrics to the panel
+            lyrics_display::set_lyrics(artist, title, lyrics);
         }
 
         std::string result_msg(message.get_ptr());
@@ -2442,19 +2448,23 @@ static void RunWack(metadb_handle_list_cref data) {
 class lyrics_playback_callback : public play_callback_static {
 public:
     unsigned get_flags() override {
-        return flag_on_playback_new_track;
+        return flag_on_playback_new_track | flag_on_playback_time | flag_on_playback_seek | flag_on_playback_stop;
     }
 
-    void on_playback_starting(play_control::t_track_command p_command, bool p_paused) override {
-        FB2K_console_formatter() << "[Lyrics] e";
+    void on_playback_starting(play_control::t_track_command p_command, bool p_paused) override {}
+    void on_playback_stop(play_control::t_stop_reason p_reason) override {
+        lyrics_display::clear();
     }
-    void on_playback_stop(play_control::t_stop_reason p_reason) override {}
-    void on_playback_seek(double p_time) override {}
+    void on_playback_seek(double p_time) override {
+        lyrics_display::update_time(p_time);
+    }
     void on_playback_pause(bool p_state) override {}
     void on_playback_edited(metadb_handle_ptr p_track) override {}
     void on_playback_dynamic_info(const file_info& p_info) override {}
     void on_playback_dynamic_info_track(const file_info& p_info) override {}
-    void on_playback_time(double p_time) override {}
+    void on_playback_time(double p_time) override {
+        lyrics_display::update_time(p_time);
+    }
     void on_volume_change(float p_new_val) override {}
 
     void on_playback_new_track(metadb_handle_ptr p_track) override {
@@ -2477,6 +2487,11 @@ public:
 
             if (!lyrics.empty()) {
                 FB2K_console_formatter() << "[Lyrics] " << artist.c_str() << " - " << title.c_str() << "\n\n" << lyrics.c_str();
+                // Send cached lyrics to the panel
+                lyrics_display::set_lyrics(artist, title, lyrics);
+            } else {
+                // No cached lyrics found, clear the panel
+                lyrics_display::clear();
             }
         }
     }
