@@ -76,6 +76,12 @@ static std::mutex g_panels_mutex;
     _titleLabel.backgroundColor = [NSColor clearColor];
     _titleLabel.textColor = [NSColor labelColor];
     _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    // Enable text wrapping
+    _titleLabel.lineBreakMode = NSLineBreakByWordWrapping;
+    _titleLabel.cell.wraps = YES;
+    _titleLabel.preferredMaxLayoutWidth = 0;  // Will be set by constraints
+    [_titleLabel setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+    [_titleLabel setContentHuggingPriority:NSLayoutPriorityDefaultHigh forOrientation:NSLayoutConstraintOrientationVertical];
     [self.view addSubview:_titleLabel];
 
     // Scroll view for lyrics text
