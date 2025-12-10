@@ -26,6 +26,7 @@
 		AA9320992E2B1FCB00559177 /* wac.xml in Resources */ = {isa = PBXBuildFile; fileRef = AA9320982E2B1FCB00559177 /* wac.xml */; };
 		AACJSON0001 /* cJSON.c in Sources */ = {isa = PBXBuildFile; fileRef = AACJSON0002 /* cJSON.c */; };
 		AADFFA242EE5108C0020C644 /* LyricsPanel.mm in Sources */ = {isa = PBXBuildFile; fileRef = AADFFA232EE5108C0020C644 /* LyricsPanel.mm */; };
+		AASTATUSBAR01 /* StatusBarNowPlaying.mm in Sources */ = {isa = PBXBuildFile; fileRef = AASTATUSBAR02 /* StatusBarNowPlaying.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -206,6 +207,8 @@
 		AADFFA222EE5108C0020C644 /* LyricsPanel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LyricsPanel.h; sourceTree = "<group>"; };
 		AADFFA232EE5108C0020C644 /* LyricsPanel.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = LyricsPanel.mm; sourceTree = "<group>"; };
 		AADFFA252EE5125E0020C644 /* lyrics_display.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = lyrics_display.h; sourceTree = "<group>"; };
+		AASTATUSBAR02 /* StatusBarNowPlaying.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = StatusBarNowPlaying.mm; sourceTree = "<group>"; };
+		AASTATUSBAR03 /* StatusBarNowPlaying.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StatusBarNowPlaying.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -309,6 +312,8 @@
 				0FCA71122AA21F69001CB0F2 /* fooSampleDSPView.mm */,
 				0FCA71132AA21F69001CB0F2 /* fooSampleDSPView.xib */,
 				AADFFA252EE5125E0020C644 /* lyrics_display.h */,
+				AASTATUSBAR02 /* StatusBarNowPlaying.mm */,
+				AASTATUSBAR03 /* StatusBarNowPlaying.h */,
 			);
 			path = Mac;
 			sourceTree = "<group>";
@@ -679,6 +684,7 @@
 				0F1FDDBA2AA0ADDF00DE8967 /* initquit.cpp in Sources */,
 				AADFFA242EE5108C0020C644 /* LyricsPanel.mm in Sources */,
 				AACJSON0001 /* cJSON.c in Sources */,
+				AASTATUSBAR01 /* StatusBarNowPlaying.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
