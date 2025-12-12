@@ -105,13 +105,7 @@
 
     if (self.isPlaying && self.currentTitle.length > 0) {
         NSString *icon = self.isPaused ? @"❚❚" : @"▶";
-        NSString *trackInfo;
-
-        if (self.currentArtist.length > 0) {
-            trackInfo = [NSString stringWithFormat:@"%@ - %@", self.currentArtist, self.currentTitle];
-        } else {
-            trackInfo = self.currentTitle;
-        }
+        NSString *trackInfo = self.currentTitle;
 
         // Truncate if too long
         if (trackInfo.length > 40) {

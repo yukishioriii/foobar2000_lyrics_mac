@@ -11,6 +11,15 @@
 #import <vector>
 #import <mutex>
 
+// Configuration key constants
+NSString * const kLyricsPanelFontSize = @"font-size";
+NSString * const kLyricsPanelFontName = @"font-name";
+NSString * const kLyricsPanelLineSpacing = @"line-spacing";
+
+// Default values
+static const CGFloat kDefaultFontSize = 14.0;
+static const CGFloat kDefaultLineSpacing = 1.2;
+
 // Panel instance tracking
 static std::vector<__weak LyricsPanel*> g_panels;
 static std::mutex g_panels_mutex;
@@ -32,16 +41,49 @@ static std::mutex g_panels_mutex;
 @property (nonatomic) BOOL hasSyncedLyrics;
 @property (nonatomic) NSInteger currentLineIndex;
 @property (nonatomic, strong) NSString *rawLyrics;
+// Configuration properties
+@property (nonatomic) CGFloat fontSize;
+@property (nonatomic, strong) NSString *fontName;
+@property (nonatomic) CGFloat lineSpacing;
 @end
 
 @implementation LyricsPanel
 
 - (instancetype)init {
+    return [self initWithConfiguration:nil];
+}
+
+- (instancetype)initWithConfiguration:(NSDictionary<NSString *, NSString *> *)config {
     self = [super initWithNibName:nil bundle:nil];
     if (self) {
         _lyricLines = [NSMutableArray new];
         _hasSyncedLyrics = NO;
         _currentLineIndex = -1;
+
+        // Parse configuration with defaults
+        _fontSize = kDefaultFontSize;
+        _fontName = nil;  // nil means use system font
+        _lineSpacing = kDefaultLineSpacing;
+
+        if (config) {
+            NSString *fontSizeStr = config[kLyricsPanelFontSize];
+            if (fontSizeStr) {
+                CGFloat size = [fontSizeStr doubleValue];
+                if (size > 0) _fontSize = size;
+            }
+
+            NSString *fontNameStr = config[kLyricsPanelFontName];
+            if (fontNameStr && fontNameStr.length > 0) {
+                _fontName = fontNameStr;
+            }
+
+            NSString *lineSpacingStr = config[kLyricsPanelLineSpacing];
+            if (lineSpacingStr) {
+                CGFloat spacing = [lineSpacingStr doubleValue];
+                if (spacing > 0) _lineSpacing = spacing;
+            }
+        }
+
         lyrics_display::register_panel(self);
     }
     return self;
@@ -49,6 +91,34 @@ static std::mutex g_panels_mutex;
 
 - (void)dealloc {
     lyrics_display::unregister_panel(self);
+}
+
+// Helper to get the configured font
+- (NSFont *)lyricsFont {
+    if (_fontName) {
+        NSFont *font = [NSFont fontWithName:_fontName size:_fontSize];
+        if (font) return font;
+    }
+    return [NSFont systemFontOfSize:_fontSize];
+}
+
+- (NSFont *)lyricsBoldFont {
+    if (_fontName) {
+        NSFontManager *fontManager = [NSFontManager sharedFontManager];
+        NSFont *font = [NSFont fontWithName:_fontName size:_fontSize + 1];
+        if (font) {
+            NSFont *boldFont = [fontManager convertFont:font toHaveTrait:NSBoldFontMask];
+            if (boldFont) return boldFont;
+        }
+    }
+    return [NSFont boldSystemFontOfSize:_fontSize + 1];
+}
+
+// Helper to create paragraph style with line spacing
+- (NSParagraphStyle *)lyricsParagraphStyle {
+    NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
+    style.lineSpacing = (_lineSpacing - 1.0) * _fontSize;  // Convert multiplier to points
+    return style;
 }
 
 - (void)loadView {
@@ -97,11 +167,14 @@ static std::mutex g_panels_mutex;
     _lyricsTextView = [[NSTextView alloc] initWithFrame:NSZeroRect];
     _lyricsTextView.editable = NO;
     _lyricsTextView.selectable = YES;
-    _lyricsTextView.font = [NSFont systemFontOfSize:14];
+    _lyricsTextView.font = [self lyricsFont];
     _lyricsTextView.textColor = [NSColor textColor];
     _lyricsTextView.backgroundColor = [NSColor textBackgroundColor];
     _lyricsTextView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     _lyricsTextView.textContainerInset = NSMakeSize(10, 10);
+
+    // Apply default paragraph style with line spacing
+    _lyricsTextView.defaultParagraphStyle = [self lyricsParagraphStyle];
 
     // Set placeholder text
     _lyricsTextView.string = @"No lyrics loaded.\n\nLyrics will appear here when a track with lyrics is playing.";
@@ -181,8 +254,9 @@ static std::mutex g_panels_mutex;
     NSArray *lines = [text componentsSeparatedByString:@"\n"];
 
     NSDictionary *normalAttrs = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:14],
-        NSForegroundColorAttributeName: [NSColor secondaryLabelColor]
+        NSFontAttributeName: [self lyricsFont],
+        NSForegroundColorAttributeName: [NSColor secondaryLabelColor],
+        NSParagraphStyleAttributeName: [self lyricsParagraphStyle]
     };
 
     NSRegularExpression *tagRegex = [NSRegularExpression regularExpressionWithPattern:@"\\[([^\\]]+)\\]"
@@ -282,7 +356,7 @@ static std::mutex g_panels_mutex;
         LyricLine *prevLine = _lyricLines[_currentLineIndex];
         if (prevLine.range.location + prevLine.range.length <= textStorage.length) {
             [textStorage addAttributes:@{
-                NSFontAttributeName: [NSFont systemFontOfSize:14],
+                NSFontAttributeName: [self lyricsFont],
                 NSForegroundColorAttributeName: [NSColor secondaryLabelColor]
             } range:prevLine.range];
         }
@@ -295,7 +369,7 @@ static std::mutex g_panels_mutex;
         LyricLine *currentLine = _lyricLines[_currentLineIndex];
         if (currentLine.range.location + currentLine.range.length <= textStorage.length) {
             [textStorage addAttributes:@{
-                NSFontAttributeName: [NSFont boldSystemFontOfSize:15],
+                NSFontAttributeName: [self lyricsBoldFont],
                 NSForegroundColorAttributeName: [NSColor labelColor]
             } range:currentLine.range];
 
@@ -388,7 +462,15 @@ namespace {
 class ui_element_lyrics : public ui_element_mac {
 public:
     service_ptr instantiate(service_ptr arg) override {
-        LyricsPanel *panel = [[LyricsPanel alloc] init];
+        // Extract configuration dictionary from arg if provided
+        NSDictionary<NSString *, NSString *> *config = nil;
+        if (arg.is_valid()) {
+            id obj = fb2k::unwrapNSObject(arg);
+            if ([obj isKindOfClass:[NSDictionary class]]) {
+                config = (NSDictionary<NSString *, NSString *> *)obj;
+            }
+        }
+        LyricsPanel *panel = [[LyricsPanel alloc] initWithConfiguration:config];
         return fb2k::wrapNSObject(panel);
     }
 
