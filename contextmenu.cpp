@@ -2,6 +2,7 @@
 #include "../SDK/console_manager.h"
 #include "../SDK/cfg_var.h"
 #include "Mac/lyrics_display.h"
+#include "Mac/StatusBarNowPlaying.h"
 
 // {A1B2C3D4-E5F6-7890-ABCD-EF1234567890} - GUID for auto-search toggle setting
 static const GUID guid_cfg_auto_search_on_playback =
@@ -9,6 +10,17 @@ static const GUID guid_cfg_auto_search_on_playback =
 
 // Toggle: false = show cached lyrics only, true = auto-search and save
 static cfg_bool cfg_auto_search_on_playback(guid_cfg_auto_search_on_playback, false);
+
+// {C3D4E5F6-A7B8-9012-CDEF-234567890ABC} - GUID for status bar toggle setting
+static const GUID guid_cfg_show_status_bar =
+    { 0xc3d4e5f6, 0xa7b8, 0x9012, { 0xcd, 0xef, 0x23, 0x45, 0x67, 0x89, 0x0a, 0xbc } };
+
+// Toggle: true = show status bar (default), false = hide status bar
+static cfg_bool cfg_show_status_bar(guid_cfg_show_status_bar, true);
+
+bool is_status_bar_enabled() {
+    return cfg_show_status_bar;
+}
 #include <curl/curl.h>
 #include <pugixml.hpp>
 #include "cJSON.h"
@@ -2535,3 +2547,42 @@ public:
 };
 
 static mainmenu_commands_factory_t<mainmenu_commands_lyrics> g_mainmenu_lyrics;
+
+// Menu toggle for showing/hiding status bar
+// {D4E5F6A7-B8C9-0123-DEF0-456789012BCD}
+static const GUID guid_mainmenu_status_bar_toggle =
+    { 0xd4e5f6a7, 0xb8c9, 0x0123, { 0xde, 0xf0, 0x45, 0x67, 0x89, 0x01, 0x2b, 0xcd } };
+
+class mainmenu_commands_status_bar : public mainmenu_commands {
+public:
+    t_uint32 get_command_count() override { return 1; }
+
+    GUID get_command(t_uint32 p_index) override {
+        return guid_mainmenu_status_bar_toggle;
+    }
+
+    void get_name(t_uint32 p_index, pfc::string_base& p_out) override {
+        p_out = "Show now playing in menu bar";
+    }
+
+    bool get_description(t_uint32 p_index, pfc::string_base& p_out) override {
+        p_out = "When enabled, shows the current track in the macOS menu bar";
+        return true;
+    }
+
+    void execute(t_uint32 p_index, service_ptr_t<service_base>) override {
+        cfg_show_status_bar = !cfg_show_status_bar;
+        // Notify status bar to show/hide
+        statusbar_nowplaying::set_visible(cfg_show_status_bar);
+    }
+
+    bool get_display(t_uint32 p_index, pfc::string_base& p_out, t_uint32& p_flags) override {
+        get_name(p_index, p_out);
+        p_flags = cfg_show_status_bar ? flag_checked : 0;
+        return true;
+    }
+
+    GUID get_parent() override { return mainmenu_groups::playback; }
+};
+
+static mainmenu_commands_factory_t<mainmenu_commands_status_bar> g_mainmenu_status_bar;

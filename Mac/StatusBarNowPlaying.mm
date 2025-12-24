@@ -31,6 +31,7 @@
 @property (nonatomic, strong) NSString *currentTitle;
 @property (nonatomic) BOOL isPlaying;
 @property (nonatomic) BOOL isPaused;
+@property (nonatomic) BOOL isVisible;
 // Cached playlist data
 @property (nonatomic, strong) NSString *cachedPlaylistName;
 @property (nonatomic, strong) NSArray<CachedPlaylistItem *> *cachedPlaylistItems;
@@ -54,6 +55,7 @@
     if (self) {
         _isPlaying = NO;
         _isPaused = NO;
+        _isVisible = YES;  // Default to visible, will be updated from config
         [self setupStatusItem];
     }
     return self;
@@ -415,6 +417,33 @@
     });
 }
 
+- (void)setVisible:(BOOL)visible {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (self.isVisible == visible) return;
+
+        self.isVisible = visible;
+
+        if (visible) {
+            // Create status item if it doesn't exist
+            if (!self.statusItem) {
+                self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+                if (self.statusItem.button) {
+                    self.statusItem.button.target = self;
+                    self.statusItem.button.action = @selector(statusItemClicked:);
+                    [self.statusItem.button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
+                }
+            }
+            [self updateDisplay];
+        } else {
+            // Remove status item
+            if (self.statusItem) {
+                [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
+                self.statusItem = nil;
+            }
+        }
+    });
+}
+
 // MARK: - Playlist Cache
 
 - (void)refreshPlaylistCache {
@@ -612,7 +641,9 @@ void clear() {
 void initialize() {
     // Force creation of singleton on main thread
     dispatch_async(dispatch_get_main_queue(), ^{
-        [StatusBarNowPlaying shared];
+        StatusBarNowPlaying *sb = [StatusBarNowPlaying shared];
+        // Apply initial visibility from config
+        [sb setVisible:is_status_bar_enabled()];
     });
 }
 
@@ -728,6 +759,10 @@ void refresh_playlist_cache() {
 
 void shutdown() {
     [[StatusBarNowPlaying shared] destroy];
+}
+
+void set_visible(bool visible) {
+    [[StatusBarNowPlaying shared] setVisible:visible];
 }
 
 } // namespace statusbar_nowplaying

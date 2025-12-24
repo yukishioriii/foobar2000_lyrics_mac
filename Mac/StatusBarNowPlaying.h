@@ -23,4 +23,8 @@ namespace statusbar_nowplaying {
     void initialize();
     void shutdown();
     void refresh_playlist_cache();
+    void set_visible(bool visible);
 }
+
+// Check if status bar is enabled (defined in contextmenu.cpp)
+bool is_status_bar_enabled();

@@ -17,7 +17,7 @@
             <rect key="frame" x="0.0" y="0.0" width="480" height="272"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
             <subviews>
-                <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="gAP-wq-ADS">
+                <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="gAP-wq-ADS">
                     <rect key="frame" x="53" y="236" width="375" height="16"/>
                     <textFieldCell key="cell" lineBreakMode="clipping" title="This is a sample preferences page with meaningless settings." id="Ys1-JH-ENE">
                         <font key="font" usesAppearanceFont="YES"/>
@@ -25,7 +25,7 @@
                         <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="ffg-jq-WWo">
+                <textField focusRingType="none" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="ffg-jq-WWo">
                     <rect key="frame" x="192" y="175" width="96" height="21"/>
                     <constraints>
                         <constraint firstAttribute="width" constant="96" id="XvN-L9-Rez"/>
@@ -41,7 +41,7 @@
                         <binding destination="-2" name="value" keyPath="self.bogo1" id="L98-qn-0Pp"/>
                     </connections>
                 </textField>
-                <textField verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="dKG-tK-drM">
+                <textField focusRingType="none" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="dKG-tK-drM">
                     <rect key="frame" x="192" y="144" width="96" height="21"/>
                     <constraints>
                         <constraint firstAttribute="width" constant="96" id="E0A-tA-NUX"/>
@@ -58,7 +58,7 @@
                         <binding destination="-2" name="value" keyPath="self.bogo2" id="u4J-S4-MoK"/>
                     </connections>
                 </textField>
-                <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="PDz-SI-0yJ">
+                <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="PDz-SI-0yJ">
                     <rect key="frame" x="95" y="178" width="91" height="16"/>
                     <textFieldCell key="cell" lineBreakMode="clipping" title="Bogo setting 1" id="tfR-si-NsX">
                         <font key="font" metaFont="system"/>
@@ -66,7 +66,7 @@
                         <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
                     </textFieldCell>
                 </textField>
-                <textField horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="Oot-Wm-fKw">
+                <textField focusRingType="none" horizontalHuggingPriority="251" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="Oot-Wm-fKw">
                     <rect key="frame" x="93" y="147" width="93" height="16"/>
                     <textFieldCell key="cell" lineBreakMode="clipping" title="Bogo setting 2" id="rIf-7i-yhX">
                         <font key="font" metaFont="system"/>
