@@ -1,7 +1,6 @@
 # Foobar2000 lyrics components for Mac
+<img width="1680" height="1050" alt="image" src="https://github.com/user-attachments/assets/8318ca26-5c41-4a07-81dd-9b3e7b720606" />
 
-![preview image](image.png)
-![preview image 2](image2.png)
 
 
 Most of the important code related to lyrics APIs are from https://github.com/jacquesh/foo_openlyrics
@@ -98,3 +97,4 @@ Make sure you have the complete SDK structure with `pfc`, `SDK`, `helpers`, and 
 ## Resources
 
 - [foobar2000 SDK Documentation](https://wiki.hydrogenaud.io/index.php?title=Foobar2000:Development:Overview)
+
