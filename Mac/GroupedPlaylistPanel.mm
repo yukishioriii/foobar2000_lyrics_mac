@@ -75,6 +75,76 @@ struct PlaylistRow {
     NSColor* albumColor;   // Fallback color if no art
 };
 
+#pragma mark - Column Configuration Persistence
+
+// GUID for storing column configuration
+// {A1B2C3D4-E5F6-4789-ABCD-EF0123456789}
+static const GUID guid_cfg_grouped_playlist_columns =
+    { 0xa1b2c3d4, 0xe5f6, 0x4789, { 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89 } };
+
+// Default visible columns: playing, trackNo, title, artist, album, duration
+static cfg_string g_cfg_columns(guid_cfg_grouped_playlist_columns, "playing,trackNo,title,artist,album,duration");
+
+// Parse comma-separated column identifiers
+static std::vector<std::string> ParseColumnConfig(const char* config) {
+    std::vector<std::string> result;
+    if (!config || !*config) return result;
+
+    std::string str(config);
+    size_t pos = 0;
+    while ((pos = str.find(',')) != std::string::npos) {
+        std::string token = str.substr(0, pos);
+        if (!token.empty()) result.push_back(token);
+        str.erase(0, pos + 1);
+    }
+    if (!str.empty()) result.push_back(str);
+    return result;
+}
+
+// Build comma-separated string from column identifiers
+static std::string BuildColumnConfig(const std::vector<ColumnDef>& columns) {
+    std::string result;
+    for (const auto& col : columns) {
+        if (!result.empty()) result += ",";
+        result += col.identifier;
+    }
+    return result;
+}
+
+// Load columns from saved configuration
+static std::vector<ColumnDef> LoadColumnConfig() {
+    std::vector<ColumnDef> result;
+    auto savedIds = ParseColumnConfig(g_cfg_columns.get().c_str());
+    auto available = GetAvailableColumns();
+
+    for (const auto& id : savedIds) {
+        for (const auto& col : available) {
+            if (col.identifier == id) {
+                ColumnDef loadedCol = col;
+                loadedCol.visible = true;
+                result.push_back(loadedCol);
+                break;
+            }
+        }
+    }
+
+    // If no valid columns loaded, use defaults
+    if (result.empty()) {
+        for (const auto& col : available) {
+            if (col.visible) {
+                result.push_back(col);
+            }
+        }
+    }
+
+    return result;
+}
+
+// Save column configuration
+static void SaveColumnConfig(const std::vector<ColumnDef>& columns) {
+    g_cfg_columns = BuildColumnConfig(columns).c_str();
+}
+
 #pragma mark - Panel tracking for callbacks
 
 static std::vector<__weak GroupedPlaylistPanel*> g_panels;
@@ -316,13 +386,8 @@ static NSPasteboardType const kPlaylistRowPasteboardType = @"com.foobar2000.play
     if (self) {
         _playingIndex = SIZE_MAX;
 
-        // Initialize with default visible columns
-        auto allColumns = GetAvailableColumns();
-        for (const auto& col : allColumns) {
-            if (col.visible) {
-                _columns.push_back(col);
-            }
-        }
+        // Load column configuration from saved settings
+        _columns = LoadColumnConfig();
 
         // Register for callbacks
         std::lock_guard<std::mutex> lock(g_panels_mutex);
@@ -463,6 +528,7 @@ static NSPasteboardType const kPlaylistRowPasteboardType = @"com.foobar2000.play
         if (col.identifier == idStr) {
             col.visible = true;
             _columns.push_back(col);
+            SaveColumnConfig(_columns);  // Persist changes
             [self rebuildTableColumns];
             [self reloadPlaylistData];  // Reload to get new column data
             return;
@@ -477,6 +543,7 @@ static NSPasteboardType const kPlaylistRowPasteboardType = @"com.foobar2000.play
     for (auto it = _columns.begin(); it != _columns.end(); ++it) {
         if (it->identifier == idStr && !it->isBuiltIn) {
             _columns.erase(it);
+            SaveColumnConfig(_columns);  // Persist changes
             [self rebuildTableColumns];
             [self.tableView reloadData];
             return;
