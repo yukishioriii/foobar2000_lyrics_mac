@@ -27,6 +27,7 @@
 		AACJSON0001 /* cJSON.c in Sources */ = {isa = PBXBuildFile; fileRef = AACJSON0002 /* cJSON.c */; };
 		AADFFA242EE5108C0020C644 /* LyricsPanel.mm in Sources */ = {isa = PBXBuildFile; fileRef = AADFFA232EE5108C0020C644 /* LyricsPanel.mm */; };
 		AASTATUSBAR01 /* StatusBarNowPlaying.mm in Sources */ = {isa = PBXBuildFile; fileRef = AASTATUSBAR02 /* StatusBarNowPlaying.mm */; };
+		AAGRPLIST01 /* GroupedPlaylistPanel.mm in Sources */ = {isa = PBXBuildFile; fileRef = AAGRPLIST02 /* GroupedPlaylistPanel.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -209,6 +210,8 @@
 		AADFFA252EE5125E0020C644 /* lyrics_display.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = lyrics_display.h; sourceTree = "<group>"; };
 		AASTATUSBAR02 /* StatusBarNowPlaying.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = StatusBarNowPlaying.mm; sourceTree = "<group>"; };
 		AASTATUSBAR03 /* StatusBarNowPlaying.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StatusBarNowPlaying.h; sourceTree = "<group>"; };
+		AAGRPLIST02 /* GroupedPlaylistPanel.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = GroupedPlaylistPanel.mm; sourceTree = "<group>"; };
+		AAGRPLIST03 /* GroupedPlaylistPanel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GroupedPlaylistPanel.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -314,6 +317,8 @@
 				AADFFA252EE5125E0020C644 /* lyrics_display.h */,
 				AASTATUSBAR02 /* StatusBarNowPlaying.mm */,
 				AASTATUSBAR03 /* StatusBarNowPlaying.h */,
+				AAGRPLIST03 /* GroupedPlaylistPanel.h */,
+				AAGRPLIST02 /* GroupedPlaylistPanel.mm */,
 			);
 			path = Mac;
 			sourceTree = "<group>";
@@ -685,6 +690,7 @@
 				AADFFA242EE5108C0020C644 /* LyricsPanel.mm in Sources */,
 				AACJSON0001 /* cJSON.c in Sources */,
 				AASTATUSBAR01 /* StatusBarNowPlaying.mm in Sources */,
+				AAGRPLIST01 /* GroupedPlaylistPanel.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
